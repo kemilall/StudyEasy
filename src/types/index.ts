@@ -4,6 +4,7 @@ export interface Subject {
   color: string;
   lessonsCount: number;
   completedLessons: number;
+  description?: string;
 }
 
 export interface Lesson {
@@ -13,21 +14,29 @@ export interface Lesson {
   chaptersCount: number;
   completedChapters: number;
   duration: number; // in minutes
+  description?: string;
 }
 
 export interface Chapter {
   id: string;
   lessonId: string;
   name: string;
-  audioUrl?: string;
+  description?: string;
+  status: ChapterStatus;
+  sourceType: ChapterSource;
   summary?: string;
   bulletPoints?: string[];
-  transcription?: string;
+  sections?: CourseSection[];
+  transcript?: string;
+  audioRemoteUrl?: string | null;
   flashcards?: Flashcard[];
   quiz?: QuizQuestion[];
   isProcessing: boolean;
   isCompleted: boolean;
   duration: number; // in minutes
+  failureReason?: string | null;
+  created_at?: string;
+  completed_at?: string | null;
 }
 
 export interface Flashcard {
@@ -51,3 +60,13 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
 }
+
+export interface CourseSection {
+  heading: string;
+  overview: string;
+  key_points: string[];
+  detailed_content: string;
+}
+
+export type ChapterStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type ChapterSource = 'text' | 'audio';

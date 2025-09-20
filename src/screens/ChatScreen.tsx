@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -17,6 +18,7 @@ import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { RootStackParamList } from '../navigation/types';
 import { ChatMessage } from '../types';
+import { fetchChatHistory, sendChatMessage } from '../api/backend';
 
 type ChatScreenRouteProp = RouteProp<RootStackParamList, 'Chat'>;
 type ChatScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Chat'>;
@@ -24,40 +26,67 @@ type ChatScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Chat'>;
 export const ChatScreen: React.FC = () => {
   const navigation = useNavigation<ChatScreenNavigationProp>();
   const route = useRoute<ChatScreenRouteProp>();
+  const { chapterId } = route.params;
+
   const [inputText, setInputText] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: '1',
-      role: 'assistant',
-      content: 'Bonjour! Je suis votre assistant IA pour ce chapitre. N\'hésitez pas à me poser des questions sur le cours.',
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
-  const handleSend = () => {
-    if (inputText.trim() === '') return;
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        setError(null);
+        setIsLoading(true);
+        const history = await fetchChatHistory(chapterId);
+        if (history.length === 0) {
+          setMessages([
+            {
+              id: 'assistant-intro',
+              role: 'assistant',
+              content: "Bonjour ! Posez-moi toutes vos questions sur le cours, je suis là pour vous aider.",
+              timestamp: new Date(),
+            },
+          ]);
+        } else {
+          setMessages(history);
+        }
+      } catch (_err) {
+        setError("Impossible de charger l'historique du chat.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadHistory();
+  }, [chapterId]);
+
+  const handleSend = async () => {
+    if (inputText.trim() === '' || isSending) return;
 
     const userMessage: ChatMessage = {
-      id: Date.now().toString(),
+      id: `temp-${Date.now()}`,
       role: 'user',
       content: inputText.trim(),
       timestamp: new Date(),
     };
 
-    setMessages([...messages, userMessage]);
+    const optimisticMessages = [...messages, userMessage];
+    setMessages(optimisticMessages);
     setInputText('');
+    setIsSending(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: 'Je comprends votre question. Voici une explication détaillée basée sur le contenu du cours...',
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, aiMessage]);
-    }, 1000);
+    try {
+      const updated = await sendChatMessage(chapterId, userMessage.content);
+      setMessages(updated);
+    } catch (_err) {
+      setMessages(messages);
+      setError("Impossible d'envoyer le message. Réessayez plus tard.");
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {
@@ -102,11 +131,11 @@ export const ChatScreen: React.FC = () => {
           <Text style={styles.title}>Assistant IA</Text>
           <View style={styles.statusContainer}>
             <View style={styles.statusDot} />
-            <Text style={styles.statusText}>En ligne</Text>
+            <Text style={styles.statusText}>{isSending ? 'Réponse en cours...' : 'En ligne'}</Text>
           </View>
         </View>
         
-        <TouchableOpacity style={styles.menuButton}>
+        <TouchableOpacity style={styles.menuButton} onPress={() => setError(null)}>
           <Ionicons name="ellipsis-horizontal" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
       </View>
@@ -116,15 +145,28 @@ export const ChatScreen: React.FC = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          renderItem={renderMessage}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.messagesList}
-          showsVerticalScrollIndicator={false}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
-        />
+        {isLoading ? (
+          <View style={[styles.loaderContainer, styles.centered]}>
+            <ActivityIndicator size="large" color={Colors.accent.blue} />
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderMessage}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.messagesList}
+            showsVerticalScrollIndicator={false}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          />
+        )}
+
+        {error && (
+          <View style={styles.errorBanner}>
+            <Ionicons name="alert-circle" size={20} color={Colors.accent.red} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
 
         <View style={styles.inputContainer}>
           <TextInput
@@ -134,21 +176,25 @@ export const ChatScreen: React.FC = () => {
             placeholder="Poser une question..."
             placeholderTextColor={Colors.text.tertiary}
             multiline
-            maxHeight={100}
+            editable={!isSending}
           />
           <TouchableOpacity
             style={[
               styles.sendButton,
-              inputText.trim() === '' && styles.sendButtonDisabled
+              (inputText.trim() === '' || isSending) && styles.sendButtonDisabled
             ]}
             onPress={handleSend}
-            disabled={inputText.trim() === ''}
+            disabled={inputText.trim() === '' || isSending}
           >
-            <Ionicons 
-              name="send" 
-              size={20} 
-              color={inputText.trim() === '' ? Colors.text.tertiary : Colors.accent.blue} 
-            />
+            {isSending ? (
+              <ActivityIndicator size="small" color={Colors.accent.blue} />
+            ) : (
+              <Ionicons 
+                name="send" 
+                size={20} 
+                color={inputText.trim() === '' ? Colors.text.tertiary : Colors.accent.blue} 
+              />
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -204,21 +250,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'flex-end',
   },
+  loaderContainer: {
+    flex: 1,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
   content: {
     flex: 1,
   },
   messagesList: {
     paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingVertical: 24,
+    gap: 16,
   },
   messageContainer: {
-    marginBottom: 16,
+    flexDirection: 'row',
+    gap: 12,
   },
   userMessageContainer: {
-    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
   },
   assistantMessageContainer: {
-    flexDirection: 'row',
     alignItems: 'flex-start',
   },
   avatarContainer: {
@@ -228,28 +283,27 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent.purple + '15',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
   messageBubble: {
-    maxWidth: '80%',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    padding: 16,
+    borderRadius: 16,
+    maxWidth: '75%',
   },
   userBubble: {
     backgroundColor: Colors.accent.blue,
+    borderTopRightRadius: 4,
+    marginLeft: 'auto',
   },
   assistantBubble: {
     backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.gray[200],
+    borderTopLeftRadius: 4,
   },
   messageText: {
     ...Typography.body,
     lineHeight: 22,
   },
   userText: {
-    color: Colors.text.inverse,
+    color: Colors.surface,
   },
   assistantText: {
     color: Colors.text.primary,
@@ -261,29 +315,49 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderTopWidth: 1,
     borderTopColor: Colors.gray[200],
-    backgroundColor: Colors.background,
+    gap: 12,
   },
   input: {
     flex: 1,
+    minHeight: 48,
+    maxHeight: 120,
     backgroundColor: Colors.surface,
-    borderRadius: 20,
+    borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingRight: 48,
-    ...Typography.body,
     color: Colors.text.primary,
-    maxHeight: 100,
   },
   sendButton: {
-    position: 'absolute',
-    right: 32,
-    bottom: 24,
-    width: 32,
-    height: 32,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
   sendButtonDisabled: {
-    opacity: 0.5,
+    backgroundColor: Colors.gray[100],
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 24,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: Colors.accent.red + '10',
+  },
+  errorText: {
+    ...Typography.footnote,
+    color: Colors.accent.red,
+    flex: 1,
   },
 });

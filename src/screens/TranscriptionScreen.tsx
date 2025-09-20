@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,14 +6,17 @@ import {
   ScrollView,
   SafeAreaView,
   TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { mockChapters } from '../data/mockData';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { RootStackParamList } from '../navigation/types';
+import { Chapter } from '../types';
+import { fetchChapter } from '../api/backend';
 
 type TranscriptionScreenRouteProp = RouteProp<RootStackParamList, 'Transcription'>;
 type TranscriptionScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Transcription'>;
@@ -23,39 +26,55 @@ export const TranscriptionScreen: React.FC = () => {
   const route = useRoute<TranscriptionScreenRouteProp>();
   const { chapterId } = route.params;
 
-  const chapter = mockChapters.find(c => c.id === chapterId);
+  const [chapter, setChapter] = useState<Chapter | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!chapter || !chapter.transcription) {
-    return null;
+  const loadChapter = useCallback(async () => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      const data = await fetchChapter(chapterId);
+      setChapter(data);
+    } catch (_err) {
+      setError("Impossible de charger la transcription.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [chapterId]);
+
+  useEffect(() => {
+    loadChapter();
+  }, [loadChapter]);
+
+  if (isLoading && !chapter) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={Colors.accent.blue} />
+      </SafeAreaView>
+    );
   }
 
-  // Mock transcription with timestamps
-  const transcriptionParagraphs = [
-    {
-      time: '00:00',
-      text: 'Bonjour et bienvenue dans ce cours sur les matrices. Aujourd\'hui, nous allons explorer les concepts fondamentaux qui constituent la base de l\'algèbre linéaire.',
-    },
-    {
-      time: '00:45',
-      text: 'Une matrice est essentiellement un tableau rectangulaire de nombres, arrangés en lignes et colonnes. Cette structure simple cache une puissance remarquable pour résoudre des problèmes complexes.',
-    },
-    {
-      time: '01:30',
-      text: 'Commençons par la notation. Une matrice est généralement notée par une lettre majuscule, comme A, B ou C. Les éléments individuels sont notés avec des indices.',
-    },
-    {
-      time: '02:15',
-      text: 'Par exemple, dans une matrice A, l\'élément situé à la ligne i et colonne j est noté a_ij. Cette notation nous permet de référencer précisément chaque élément.',
-    },
-    {
-      time: '03:00',
-      text: 'Les opérations de base sur les matrices incluent l\'addition et la soustraction. Pour additionner deux matrices, elles doivent avoir les mêmes dimensions.',
-    },
-    {
-      time: '03:45',
-      text: 'La multiplication matricielle est plus complexe. Le produit AB n\'est défini que si le nombre de colonnes de A égale le nombre de lignes de B.',
-    },
-  ];
+  if (error) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <Ionicons name="warning" size={36} color={Colors.accent.red} />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={loadChapter}>
+          <Text style={styles.retryText}>Réessayer</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  if (!chapter || !chapter.transcript) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <Ionicons name="document-outline" size={32} color={Colors.text.tertiary} />
+        <Text style={styles.emptyText}>Aucune transcription disponible pour le moment.</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -78,15 +97,10 @@ export const TranscriptionScreen: React.FC = () => {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={loadChapter} />}
       >
         <Text style={styles.chapterName}>{chapter.name}</Text>
-        
-        {transcriptionParagraphs.map((paragraph, index) => (
-          <View key={index} style={styles.paragraph}>
-            <Text style={styles.timestamp}>{paragraph.time}</Text>
-            <Text style={styles.text}>{paragraph.text}</Text>
-          </View>
-        ))}
+        <Text style={styles.text}>{chapter.transcript}</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -96,6 +110,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+    paddingHorizontal: 32,
   },
   header: {
     flexDirection: 'row',
@@ -133,18 +153,29 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     marginBottom: 24,
   },
-  paragraph: {
-    marginBottom: 24,
-  },
-  timestamp: {
-    ...Typography.caption1,
-    color: Colors.accent.blue,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
   text: {
     ...Typography.body,
     color: Colors.text.primary,
-    lineHeight: 24,
+    lineHeight: 26,
+  },
+  errorText: {
+    ...Typography.subheadline,
+    color: Colors.accent.red,
+    textAlign: 'center',
+  },
+  retryButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: Colors.accent.blue,
+    borderRadius: 24,
+  },
+  retryText: {
+    ...Typography.footnote,
+    color: Colors.surface,
+  },
+  emptyText: {
+    ...Typography.subheadline,
+    color: Colors.text.secondary,
+    textAlign: 'center',
   },
 });

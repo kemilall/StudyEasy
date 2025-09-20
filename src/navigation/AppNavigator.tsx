@@ -179,7 +179,7 @@ export const AppNavigator: React.FC = () => {
           name="ProcessingScreen" 
           component={ProcessingScreen}
           options={{
-            presentation: 'fullScreenModal',
+            presentation: 'modal',
           }}
         />
       </Stack.Navigator>

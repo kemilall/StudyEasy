@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,40 +6,91 @@ import {
   FlatList,
   SafeAreaView,
   TouchableOpacity,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LessonCard } from '../components/LessonCard';
-import { mockSubjects, mockLessons } from '../data/mockData';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
-import { RootStackParamList } from '../navigation/types';
+import { RootStackParamList, SubjectsStackParamList } from '../navigation/types';
+import { Lesson, Subject } from '../types';
+import { fetchLessonsBySubject, fetchSubject } from '../api/backend';
+import { loadCachedLessons, loadCachedSubject } from '../firebase/firestore';
+import { useAuth } from '../context/AuthContext';
 
-type SubjectScreenRouteProp = RouteProp<RootStackParamList, 'Subject'>;
-type SubjectScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Subject'>;
+type SubjectScreenRouteProp = RouteProp<SubjectsStackParamList, 'Subject'>;
 
 export const SubjectScreen: React.FC = () => {
-  const navigation = useNavigation<SubjectScreenNavigationProp>();
+  const navigation = useNavigation<any>();
+  const { user } = useAuth();
   const route = useRoute<SubjectScreenRouteProp>();
   const { subjectId } = route.params;
 
-  const subject = mockSubjects.find(s => s.id === subjectId);
-  const lessons = mockLessons.filter(l => l.subjectId === subjectId);
+  const [subject, setSubject] = useState<Subject | null>(null);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!subject) {
-    return null;
-  }
+  const loadData = useCallback(async () => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      const [subjectData, lessonsData] = await Promise.all([
+        fetchSubject(subjectId),
+        fetchLessonsBySubject(subjectId),
+      ]);
+      setSubject(subjectData);
+      setLessons(lessonsData);
+    } catch (_err) {
+      setError("Impossible de charger cette matière.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [subjectId]);
 
-  const renderLesson = ({ item }: { item: typeof lessons[0] }) => (
+  useEffect(() => {
+    let isMounted = true;
+
+    const bootstrapFromCache = async () => {
+      if (!user) return;
+      const cachedSubject = await loadCachedSubject(subjectId);
+      const cachedLessons = await loadCachedLessons(subjectId);
+      if (isMounted) {
+        if (cachedSubject) {
+          setSubject(cachedSubject);
+        }
+        if (cachedLessons.length) {
+          setLessons(cachedLessons);
+        }
+      }
+    };
+
+    bootstrapFromCache();
+    loadData();
+    return () => {
+      isMounted = false;
+    };
+  }, [user, loadData]);
+
+  const renderLesson = ({ item }: { item: Lesson }) => (
     <LessonCard
       lesson={item}
       onPress={() => navigation.navigate('Lesson', { lessonId: item.id })}
     />
   );
 
-  return (
-    <SafeAreaView style={styles.container}>
+  const renderHeader = () => {
+    if (!subject) {
+      return null;
+    }
+
+    const progress = subject.lessonsCount > 0
+      ? Math.round((subject.completedLessons / subject.lessonsCount) * 100)
+      : 0;
+
+    return (
       <View style={styles.header}>
         <TouchableOpacity 
           onPress={() => navigation.goBack()}
@@ -55,6 +106,40 @@ export const SubjectScreen: React.FC = () => {
           <Text style={styles.title}>{subject.name}</Text>
         </View>
       </View>
+    );
+  };
+
+  if (isLoading && !subject) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={Colors.accent.blue} />
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <Ionicons name="warning" size={36} color={Colors.accent.red} />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={loadData}>
+          <Text style={styles.retryText}>Réessayer</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  if (!subject) {
+    return null;
+  }
+
+  const progress = subject.lessonsCount > 0
+    ? Math.round((subject.completedLessons / subject.lessonsCount) * 100)
+    : 0;
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {renderHeader()}
 
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
@@ -68,14 +153,19 @@ export const SubjectScreen: React.FC = () => {
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>
-            {subject.lessonsCount > 0 
-              ? Math.round((subject.completedLessons / subject.lessonsCount) * 100)
-              : 0}%
-          </Text>
+          <Text style={styles.statValue}>{progress}%</Text>
           <Text style={styles.statLabel}>Progression</Text>
         </View>
       </View>
+
+      <TouchableOpacity 
+        style={styles.addLessonButton}
+        onPress={() => navigation.navigate('CreateLessonScreen', { subjectId })}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="add-circle-outline" size={20} color={Colors.accent.blue} />
+        <Text style={styles.addLessonText}>Ajouter une leçon</Text>
+      </TouchableOpacity>
 
       <FlatList
         data={lessons}
@@ -83,8 +173,15 @@ export const SubjectScreen: React.FC = () => {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={loadData} />}
+        ListEmptyComponent={!isLoading ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="documents-outline" size={28} color={Colors.text.tertiary} />
+            <Text style={styles.emptyTitle}>Pas encore de leçon</Text>
+            <Text style={styles.emptySubtitle}>Créez votre première leçon pour cette matière.</Text>
+          </View>
+        ) : null}
       />
-
     </SafeAreaView>
   );
 };
@@ -93,6 +190,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
   },
   header: {
     paddingHorizontal: 24,
@@ -123,7 +225,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: Colors.surface,
     marginHorizontal: 24,
-    marginBottom: 24,
+    marginBottom: 16,
     borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
@@ -153,8 +255,50 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.gray[200],
     marginVertical: 4,
   },
+  addLessonButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
+    marginHorizontal: 24,
+    marginBottom: 12,
+  },
+  addLessonText: {
+    ...Typography.subheadline,
+    color: Colors.accent.blue,
+    fontWeight: '600',
+  },
   listContent: {
     paddingHorizontal: 24,
-    paddingBottom: 100,
+    paddingBottom: 120,
+  },
+  emptyState: {
+    marginTop: 40,
+    alignItems: 'center',
+    gap: 8,
+  },
+  emptyTitle: {
+    ...Typography.headline,
+    color: Colors.text.secondary,
+  },
+  emptySubtitle: {
+    ...Typography.subheadline,
+    color: Colors.text.tertiary,
+    textAlign: 'center',
+  },
+  errorText: {
+    ...Typography.subheadline,
+    color: Colors.accent.red,
+    textAlign: 'center',
+  },
+  retryButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: Colors.accent.blue,
+    borderRadius: 24,
+  },
+  retryText: {
+    ...Typography.footnote,
+    color: Colors.surface,
   },
 });

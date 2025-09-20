@@ -12,11 +12,28 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 
+type ToggleSettingsItem = {
+  icon: string;
+  label: string;
+  isToggle: true;
+  value: boolean;
+  onToggle: (value: boolean) => void;
+};
+
+type ActionSettingsItem = {
+  icon: string;
+  label: string;
+  value?: string;
+  onPress: () => void;
+};
+
+type SettingsItem = ToggleSettingsItem | ActionSettingsItem;
+
 export const SettingsScreen: React.FC = () => {
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = React.useState(false);
 
-  const settingsSections = [
+  const settingsSections: Array<{ title: string; items: SettingsItem[] }> = [
     {
       title: 'Compte',
       items: [
@@ -102,9 +119,9 @@ export const SettingsScreen: React.FC = () => {
                     styles.settingItem,
                     itemIndex === section.items.length - 1 && styles.lastItem,
                   ]}
-                  onPress={item.onPress}
-                  disabled={item.isToggle}
-                  activeOpacity={item.isToggle ? 1 : 0.7}
+                  onPress={'onPress' in item ? item.onPress : undefined}
+                  disabled={'isToggle' in item}
+                  activeOpacity={'isToggle' in item ? 1 : 0.7}
                 >
                   <View style={styles.settingLeft}>
                     <Ionicons 
@@ -114,7 +131,7 @@ export const SettingsScreen: React.FC = () => {
                     />
                     <Text style={styles.settingLabel}>{item.label}</Text>
                   </View>
-                  {item.isToggle ? (
+                  {'isToggle' in item ? (
                     <Switch
                       value={item.value}
                       onValueChange={item.onToggle}
@@ -126,7 +143,7 @@ export const SettingsScreen: React.FC = () => {
                     />
                   ) : (
                     <View style={styles.settingRight}>
-                      {item.value && (
+                      {'value' in item && item.value && (
                         <Text style={styles.settingValue}>{item.value}</Text>
                       )}
                       <Ionicons 
@@ -247,4 +264,3 @@ const styles = StyleSheet.create({
     color: Colors.text.tertiary,
   },
 });
-

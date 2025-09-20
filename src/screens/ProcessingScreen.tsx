@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -6,88 +6,131 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Animated,
+  ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
+import { fetchChapter } from '../api/backend';
+import { Chapter } from '../types';
 
 const PROCESSING_STEPS = [
   {
     id: 1,
-    title: 'Analyse de l\'audio',
-    subtitle: 'Extraction et optimisation du signal audio',
+    title: 'Analyse de l\'entrée',
+    subtitle: 'Préparation du contenu à traiter',
     icon: 'waveform',
-    duration: 3000,
   },
   {
     id: 2,
     title: 'Transcription',
-    subtitle: 'Conversion de la parole en texte',
+    subtitle: 'Conversion du contenu en texte exploitable',
     icon: 'document-text',
-    duration: 4000,
   },
   {
     id: 3,
-    title: 'Génération du résumé',
-    subtitle: 'Analyse et synthèse du contenu',
+    title: 'Synthèse du cours',
+    subtitle: 'Structure et rédaction du chapitre',
     icon: 'bulb',
-    duration: 3000,
   },
   {
     id: 4,
-    title: 'Création des flashcards',
-    subtitle: 'Identification des concepts clés',
+    title: 'Flashcards et Quiz',
+    subtitle: 'Extraction des notions clés',
     icon: 'albums',
-    duration: 2500,
   },
   {
     id: 5,
-    title: 'Génération du quiz',
-    subtitle: 'Création de questions personnalisées',
-    icon: 'help-circle',
-    duration: 2000,
-  },
-  {
-    id: 6,
     title: 'Finalisation',
     subtitle: 'Organisation et sauvegarde du contenu',
     icon: 'checkmark-circle',
-    duration: 1500,
   },
 ];
 
+type ProcessingRouteProp = RouteProp<{ params: { chapterId: string } }, 'params'>;
+
+const POLL_INTERVAL = 5000;
+
 export const ProcessingScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
+  const route = useRoute<ProcessingRouteProp>();
+  const { chapterId } = route.params;
+
   const [currentStep, setCurrentStep] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isFailed, setIsFailed] = useState(false);
   const [progressAnim] = useState(new Animated.Value(0));
+  const [chapter, setChapter] = useState<Chapter | null>(null);
 
   useEffect(() => {
-    const processSteps = async () => {
-      for (let i = 0; i < PROCESSING_STEPS.length; i++) {
-        setCurrentStep(i);
-        
-        // Animer la barre de progression
-        Animated.timing(progressAnim, {
-          toValue: (i + 1) / PROCESSING_STEPS.length,
-          duration: PROCESSING_STEPS[i].duration,
-          useNativeDriver: false,
-        }).start();
+    let isMounted = true;
+    let timer: ReturnType<typeof setInterval> | null = null;
 
-        // Attendre la durée de l'étape
-        await new Promise(resolve => setTimeout(resolve, PROCESSING_STEPS[i].duration));
+    const pollStatus = async () => {
+      try {
+        const data = await fetchChapter(chapterId);
+        if (!isMounted) return;
+        setChapter(data);
+        if (data.status === 'completed') {
+          setIsCompleted(true);
+          setIsFailed(false);
+          Animated.timing(progressAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: false,
+          }).start();
+          setCurrentStep(PROCESSING_STEPS.length - 1);
+          if (timer) clearInterval(timer);
+          setTimeout(() => {
+            navigation.navigate('Chapter', { chapterId });
+          }, 1200);
+        } else if (data.status === 'failed') {
+          setIsFailed(true);
+          if (timer) clearInterval(timer);
+        } else {
+          setIsFailed(false);
+          Animated.timing(progressAnim, {
+            toValue: 0.2 + Math.random() * 0.6,
+            duration: 800,
+            useNativeDriver: false,
+          }).start();
+          setCurrentStep((prev) => Math.min(prev + 1, PROCESSING_STEPS.length - 1));
+        }
+      } catch (error) {
+        // Ignorer l'erreur ponctuelle, réessaie au prochain tick
       }
-      
-      setIsCompleted(true);
     };
 
-    processSteps();
-  }, []);
+    pollStatus();
+    timer = setInterval(pollStatus, POLL_INTERVAL);
 
-  const handleComplete = () => {
-    navigation.navigate('Chapter' as never, { chapterId: '1' } as never);
-  };
+    return () => {
+      isMounted = false;
+      if (timer) clearInterval(timer);
+    };
+  }, [chapterId, navigation, progressAnim]);
+
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
+
+  const displaySubtitle = useMemo(() => {
+    if (isFailed) {
+      return 'La génération a échoué. Retournez au chapitre et réessayez.';
+    }
+    if (isCompleted) {
+      return 'Votre chapitre est prêt avec tous les contenus générés.';
+    }
+    return PROCESSING_STEPS[currentStep]?.subtitle ?? '';
+  }, [currentStep, isCompleted, isFailed]);
+
+  const displayTitle = useMemo(() => {
+    if (isFailed) return 'Une erreur est survenue';
+    if (isCompleted) return 'Traitement terminé !';
+    return PROCESSING_STEPS[currentStep]?.title ?? 'Traitement en cours';
+  }, [currentStep, isCompleted, isFailed]);
 
   const handleCancel = () => {
     navigation.goBack();
@@ -107,7 +150,6 @@ export const ProcessingScreen: React.FC = () => {
       </View>
 
       <View style={styles.content}>
-        {/* Animation centrale */}
         <View style={styles.animationContainer}>
           <View style={styles.circularProgress}>
             <Animated.View 
@@ -124,73 +166,69 @@ export const ProcessingScreen: React.FC = () => {
               ]} 
             />
             <View style={styles.centerIcon}>
-              <Ionicons 
-                name={isCompleted ? "checkmark" : PROCESSING_STEPS[currentStep]?.icon as any} 
-                size={32} 
-                color={isCompleted ? Colors.accent.green : Colors.accent.blue} 
-              />
+              {isFailed ? (
+                <Ionicons name="warning" size={32} color={Colors.accent.red} />
+              ) : isCompleted ? (
+                <Ionicons name="checkmark" size={32} color={Colors.accent.green} />
+              ) : (
+                <Ionicons 
+                  name={PROCESSING_STEPS[currentStep]?.icon as any} 
+                  size={32} 
+                  color={Colors.accent.blue} 
+                />
+              )}
             </View>
           </View>
           
           <Text style={styles.mainTitle}>
-            {isCompleted ? 'Traitement terminé !' : PROCESSING_STEPS[currentStep]?.title}
+            {displayTitle}
           </Text>
           <Text style={styles.mainSubtitle}>
-            {isCompleted 
-              ? 'Votre chapitre est prêt avec tous les contenus générés'
-              : PROCESSING_STEPS[currentStep]?.subtitle
-            }
+            {displaySubtitle}
           </Text>
         </View>
 
-        {/* Barre de progression */}
         <View style={styles.progressSection}>
           <View style={styles.progressBar}>
-            <Animated.View 
-              style={[
-                styles.progressFill,
-                {
-                  width: progressAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', '100%'],
-                  })
-                }
-              ]}
-            />
+            <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
           </View>
           <Text style={styles.progressText}>
             {isCompleted ? 'Terminé' : `${currentStep + 1} / ${PROCESSING_STEPS.length}`}
           </Text>
         </View>
 
-        {/* Liste des étapes */}
         <View style={styles.stepsList}>
           {PROCESSING_STEPS.map((step, index) => {
-            const isActive = index === currentStep;
-            const isCompleted = index < currentStep || isCompleted;
+            const isActive = index === currentStep && !isCompleted && !isFailed;
+            const completed = index < currentStep || isCompleted;
             
             return (
               <View key={step.id} style={styles.stepItem}>
                 <View style={[
                   styles.stepIcon,
                   isActive && styles.stepIconActive,
-                  isCompleted && styles.stepIconCompleted,
+                  completed && styles.stepIconCompleted,
                 ]}>
-                  <Ionicons 
-                    name={isCompleted ? "checkmark" : step.icon as any}
-                    size={16} 
-                    color={
-                      isCompleted ? Colors.accent.green :
-                      isActive ? Colors.accent.blue : 
-                      Colors.text.tertiary
-                    } 
-                  />
+                  {completed ? (
+                    <Ionicons name="checkmark" size={16} color={Colors.accent.green} />
+                  ) : isFailed && index === currentStep ? (
+                    <Ionicons name="warning" size={16} color={Colors.accent.red} />
+                  ) : (
+                    <Ionicons 
+                      name={step.icon as any}
+                      size={16}
+                      color={
+                        isActive ? Colors.accent.blue : Colors.text.tertiary
+                      }
+                    />
+                  )}
                 </View>
                 <View style={styles.stepContent}>
                   <Text style={[
                     styles.stepTitle,
                     isActive && styles.stepTitleActive,
-                    isCompleted && styles.stepTitleCompleted,
+                    completed && styles.stepTitleCompleted,
+                    isFailed && index === currentStep && styles.stepTitleFailed,
                   ]}>
                     {step.title}
                   </Text>
@@ -201,28 +239,11 @@ export const ProcessingScreen: React.FC = () => {
           })}
         </View>
 
-        {/* Informations supplémentaires */}
-        <View style={styles.infoSection}>
-          <View style={styles.infoCard}>
-            <Ionicons name="time-outline" size={20} color={Colors.text.secondary} />
-            <Text style={styles.infoText}>
-              Temps estimé : {isCompleted ? 'Terminé' : '2-3 minutes restantes'}
-            </Text>
+        {chapter?.failureReason && isFailed && (
+          <View style={styles.errorDetails}>
+            <Ionicons name="alert-circle" size={20} color={Colors.accent.red} />
+            <Text style={styles.errorDetailsText}>{chapter.failureReason}</Text>
           </View>
-          <View style={styles.infoCard}>
-            <Ionicons name="shield-checkmark-outline" size={20} color={Colors.text.secondary} />
-            <Text style={styles.infoText}>
-              Vos données sont traitées en sécurité
-            </Text>
-          </View>
-        </View>
-
-        {/* Bouton d'action */}
-        {isCompleted && (
-          <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
-            <Text style={styles.completeButtonText}>Voir le chapitre</Text>
-            <Ionicons name="arrow-forward" size={20} color={Colors.surface} />
-          </TouchableOpacity>
         )}
       </View>
     </SafeAreaView>
@@ -258,64 +279,72 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 24,
+    gap: 24,
   },
   animationContainer: {
     alignItems: 'center',
-    marginBottom: 40,
+    gap: 16,
   },
   circularProgress: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: Colors.gray[100],
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: Colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
-    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 4,
   },
   progressCircle: {
     position: 'absolute',
     width: 120,
     height: 120,
     borderRadius: 60,
-    borderWidth: 4,
-    borderColor: Colors.accent.blue,
-    borderTopColor: 'transparent',
+    borderWidth: 8,
+    borderColor: Colors.accent.blue + '30',
+    borderStyle: 'dashed',
   },
   centerIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: Colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
   mainTitle: {
-    ...Typography.title2,
+    ...Typography.headline,
     color: Colors.text.primary,
     textAlign: 'center',
-    marginBottom: 8,
   },
   mainSubtitle: {
     ...Typography.subheadline,
     color: Colors.text.secondary,
     textAlign: 'center',
-    lineHeight: 20,
   },
   progressSection: {
-    marginBottom: 40,
+    gap: 12,
   },
   progressBar: {
-    height: 8,
+    height: 6,
     backgroundColor: Colors.gray[200],
-    borderRadius: 4,
+    borderRadius: 3,
     overflow: 'hidden',
-    marginBottom: 8,
   },
   progressFill: {
     height: '100%',
     backgroundColor: Colors.accent.blue,
-    borderRadius: 4,
   },
   progressText: {
     ...Typography.footnote,
@@ -323,77 +352,59 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   stepsList: {
-    marginBottom: 32,
+    gap: 16,
   },
   stepItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
+    gap: 12,
   },
   stepIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.gray[200],
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.gray[100],
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
   },
   stepIconActive: {
-    backgroundColor: Colors.accent.blue + '20',
+    backgroundColor: Colors.accent.blue + '15',
   },
   stepIconCompleted: {
-    backgroundColor: Colors.accent.green + '20',
+    backgroundColor: Colors.accent.green + '15',
   },
   stepContent: {
     flex: 1,
+    gap: 4,
   },
   stepTitle: {
     ...Typography.subheadline,
-    color: Colors.text.tertiary,
-    fontWeight: '600',
-    marginBottom: 2,
+    color: Colors.text.secondary,
   },
   stepTitleActive: {
     color: Colors.accent.blue,
+    fontWeight: '600',
   },
   stepTitleCompleted: {
     color: Colors.accent.green,
   },
+  stepTitleFailed: {
+    color: Colors.accent.red,
+  },
   stepSubtitle: {
-    ...Typography.caption1,
+    ...Typography.footnote,
     color: Colors.text.tertiary,
   },
-  infoSection: {
-    gap: 12,
-    marginBottom: 32,
-  },
-  infoCard: {
+  errorDetails: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    padding: 16,
+    gap: 8,
+    backgroundColor: Colors.accent.red + '10',
+    padding: 12,
     borderRadius: 12,
-    gap: 12,
   },
-  infoText: {
+  errorDetailsText: {
     ...Typography.footnote,
-    color: Colors.text.secondary,
+    color: Colors.accent.red,
     flex: 1,
   },
-  completeButton: {
-    backgroundColor: Colors.accent.green,
-    borderRadius: 16,
-    padding: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  completeButtonText: {
-    ...Typography.headline,
-    color: Colors.surface,
-    fontWeight: '600',
-  },
 });
-

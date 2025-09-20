@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,22 +7,49 @@ import {
   SafeAreaView,
   TouchableOpacity,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RecentChapterCard } from '../components/RecentChapterCard';
 import { QuickQuizCard } from '../components/QuickQuizCard';
 import { StreakCard } from '../components/StreakCard';
-import { mockSubjects } from '../data/mockData';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
-type HomeScreenNavigationProp = StackNavigationProp<any, any>;
-
+import { fetchSubjects } from '../api/backend';
+import { Subject } from '../types';
+import { loadCachedSubjects } from '../firebase/firestore';
+import { useAuth } from '../context/AuthContext';
 export const HomeScreen: React.FC = () => {
-  const navigation = useNavigation<HomeScreenNavigationProp>();
+  const navigation = useNavigation<any>();
+  const { user } = useAuth();
 
-  // Mock data pour les chapitres récents
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [isLoadingSubjects, setIsLoadingSubjects] = useState<boolean>(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setIsLoadingSubjects(true);
+        if (user) {
+          const cached = await loadCachedSubjects();
+          if (cached.length) {
+            setSubjects(cached);
+          }
+        }
+        const data = await fetchSubjects();
+        setSubjects(data);
+      } catch (_err) {
+        // laisser la liste vide en cas d'erreur
+      } finally {
+        setIsLoadingSubjects(false);
+      }
+    };
+
+    load();
+  }, [user]);
+
+  // À améliorer : récupérer de vrais chapitres récents
   const recentChapters = [
     {
       id: '1',
@@ -48,25 +75,10 @@ export const HomeScreen: React.FC = () => {
   ];
 
   // Mock data pour les quiz récents
-  const recentQuizzes = [
-    {
-      id: '1',
-      subject: 'Mathématiques - Matrices',
-      questionsCount: 10,
-      difficulty: 'Moyen' as const,
-      estimatedTime: 15,
-    },
-    {
-      id: '2',
-      subject: 'Physique - Forces',
-      questionsCount: 8,
-      difficulty: 'Facile' as const,
-      estimatedTime: 10,
-    },
-  ];
+  const recentQuizzes: Array<{ id: string; subject: string; questionsCount: number; difficulty: 'Facile' | 'Moyen' | 'Difficile'; estimatedTime: number; chapterId: string }> = [];
 
   // Les 3 matières les plus utilisées
-  const topSubjects = mockSubjects.slice(0, 3);
+  const topSubjects = subjects.slice(0, 3);
 
   const renderRecentChapter = ({ item }: { item: typeof recentChapters[0] }) => (
     <RecentChapterCard
@@ -107,7 +119,7 @@ export const HomeScreen: React.FC = () => {
         <TouchableOpacity 
           style={styles.createChapterButton} 
           activeOpacity={0.8}
-          onPress={() => navigation.navigate('CreateChapterScreen' as never)}
+          onPress={() => navigation.navigate('CreateChapterScreen')}
         >
           <View style={styles.createChapterIcon}>
             <Ionicons name="add" size={24} color={Colors.accent.blue} />
@@ -146,21 +158,25 @@ export const HomeScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
           <View style={styles.subjectsGrid}>
-            {topSubjects.map((subject) => (
-              <TouchableOpacity
-                key={subject.id}
-                style={[styles.subjectCard, { backgroundColor: subject.color + '15' }]}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.subjectIcon, { backgroundColor: subject.color + '25' }]}>
-                  <Ionicons name="book" size={20} color={subject.color} />
-                </View>
-                <Text style={styles.subjectName}>{subject.name}</Text>
-                <Text style={styles.subjectLessons}>
-                  {subject.lessonsCount} leçons
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {isLoadingSubjects ? (
+              <ActivityIndicator size="small" color={Colors.accent.blue} />
+            ) : (
+              topSubjects.map((subject) => (
+                <TouchableOpacity
+                  key={subject.id}
+                  style={[styles.subjectCard, { backgroundColor: subject.color + '15' }]}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.subjectIcon, { backgroundColor: subject.color + '25' }]}>
+                    <Ionicons name="book" size={20} color={subject.color} />
+                  </View>
+                  <Text style={styles.subjectName}>{subject.name}</Text>
+                  <Text style={styles.subjectLessons}>
+                    {subject.lessonsCount} leçons
+                  </Text>
+                </TouchableOpacity>
+              ))
+            )}
           </View>
         </View>
 
@@ -179,9 +195,12 @@ export const HomeScreen: React.FC = () => {
               questionsCount={quiz.questionsCount}
               difficulty={quiz.difficulty}
               estimatedTime={quiz.estimatedTime}
-              onPress={() => navigation.navigate('Quiz', { chapterId: '1' })}
+              onPress={() => navigation.navigate('Quiz', { chapterId: quiz.chapterId })}
             />
           ))}
+          {recentQuizzes.length === 0 && (
+            <Text style={styles.placeholderText}>Les quiz apparaîtront ici lorsque des chapitres auront été générés.</Text>
+          )}
         </View>
 
       </ScrollView>
@@ -313,5 +332,10 @@ const styles = StyleSheet.create({
   subjectLessons: {
     ...Typography.caption1,
     color: Colors.text.secondary,
+  },
+  placeholderText: {
+    ...Typography.footnote,
+    color: Colors.text.tertiary,
+    marginTop: 12,
   },
 });

@@ -13,6 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
+import { createSubject } from '../api/backend';
 
 const SUBJECT_COLORS = [
   Colors.accent.blue,
@@ -41,18 +42,31 @@ export const CreateSubjectScreen: React.FC = () => {
   const [selectedColor, setSelectedColor] = useState(SUBJECT_COLORS[0]);
   const [selectedIcon, setSelectedIcon] = useState(SUBJECT_ICONS[0]);
   const [description, setDescription] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!subjectName.trim()) {
       Alert.alert('Erreur', 'Veuillez entrer un nom pour la matière.');
       return;
     }
 
-    Alert.alert(
-      'Matière créée !',
-      `La matière "${subjectName}" a été créée avec succès.`,
-      [{ text: 'OK', onPress: () => navigation.goBack() }]
-    );
+    try {
+      setIsSubmitting(true);
+      await createSubject({
+        name: subjectName.trim(),
+        color: selectedColor,
+        description: description.trim() || undefined,
+      });
+      Alert.alert(
+        'Matière créée !',
+        `La matière "${subjectName}" a été créée avec succès.`,
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+    } catch (_err) {
+      Alert.alert('Erreur', "Impossible de créer la matière. Vérifiez votre backend.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -67,11 +81,11 @@ export const CreateSubjectScreen: React.FC = () => {
         <Text style={styles.title}>Nouvelle matière</Text>
         <TouchableOpacity 
           onPress={handleCreate}
-          style={[styles.saveButton, !subjectName.trim() && styles.saveButtonDisabled]}
-          disabled={!subjectName.trim()}
+          style={[styles.saveButton, (!subjectName.trim() || isSubmitting) && styles.saveButtonDisabled]}
+          disabled={!subjectName.trim() || isSubmitting}
         >
           <Text style={[styles.saveButtonText, !subjectName.trim() && styles.saveButtonTextDisabled]}>
-            Créer
+            {isSubmitting ? '...' : 'Créer'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -321,4 +335,3 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent.blue + '10',
   },
 });
-

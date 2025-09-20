@@ -5,11 +5,11 @@ export type RootStackParamList = {
   Flashcards: { chapterId: string };
   Quiz: { chapterId: string };
   Chat: { chapterId: string };
-  AudioImportScreen: undefined;
+  AudioImportScreen: { lessonId: string; name: string; description?: string };
   CreateSubjectScreen: undefined;
   CreateLessonScreen: { subjectId?: string };
   CreateChapterScreen: { lessonId?: string };
-  ProcessingScreen: undefined;
+  ProcessingScreen: { chapterId: string };
 };
 
 export type MainTabParamList = {

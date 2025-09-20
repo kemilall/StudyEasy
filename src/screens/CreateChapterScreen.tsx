@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,32 +8,84 @@ import {
   TextInput,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { mockLessons, mockSubjects } from '../data/mockData';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
+import { createChapterFromText, fetchLesson, fetchLessonsBySubject, fetchSubjects } from '../api/backend';
+import { Lesson, Subject } from '../types';
 
 type CreateChapterScreenRouteProp = RouteProp<{ params: { lessonId?: string } }, 'params'>;
 
 export const CreateChapterScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const route = useRoute<CreateChapterScreenRouteProp>();
   const lessonId = route.params?.lessonId;
   
   const [chapterName, setChapterName] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedLesson, setSelectedLesson] = useState(
-    lessonId ? mockLessons.find(l => l.id === lessonId) : mockLessons[0]
-  );
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+  const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [hasAudio, setHasAudio] = useState(false);
+  const [textContent, setTextContent] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const getSubjectForLesson = (lesson: any) => {
-    return mockSubjects.find(s => s.id === lesson?.subjectId);
+  const loadLessonsForSubject = useCallback(async (subjectId: string) => {
+    const data = await fetchLessonsBySubject(subjectId);
+    setLessons(data);
+    const defaultLesson = lessonId ? data.find((l) => l.id === lessonId) : data[0] ?? null;
+    setSelectedLesson(defaultLesson ?? null);
+  }, [lessonId]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setError(null);
+        setIsLoading(true);
+        const subjectsData = await fetchSubjects();
+        setSubjects(subjectsData);
+
+        if (lessonId) {
+          const lessonData = await fetchLesson(lessonId);
+          const subject = subjectsData.find((s) => s.id === lessonData.subjectId) ?? null;
+          setSelectedSubject(subject);
+          await loadLessonsForSubject(lessonData.subjectId);
+          setSelectedLesson(lessonData);
+        } else {
+          const defaultSubject = subjectsData[0] ?? null;
+          setSelectedSubject(defaultSubject ?? null);
+          if (defaultSubject) {
+            await loadLessonsForSubject(defaultSubject.id);
+          }
+        }
+      } catch (_err) {
+        setError('Impossible de charger les données nécessaires.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [lessonId, loadLessonsForSubject]);
+
+  const handleSubjectChange = async (subject: Subject) => {
+    setSelectedSubject(subject);
+    setSelectedLesson(null);
+    setLessons([]);
+    try {
+      await loadLessonsForSubject(subject.id);
+    } catch (_err) {
+      Alert.alert('Erreur', 'Impossible de charger les leçons pour cette matière.');
+    }
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!chapterName.trim()) {
       Alert.alert('Erreur', 'Veuillez entrer un nom pour le chapitre.');
       return;
@@ -45,15 +97,54 @@ export const CreateChapterScreen: React.FC = () => {
     }
 
     if (hasAudio) {
-      navigation.navigate('AudioImportScreen' as never);
-    } else {
-      Alert.alert(
-        'Chapitre créé !',
-        `Le chapitre "${chapterName}" a été créé. Vous pouvez maintenant ajouter du contenu.`,
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
+      navigation.navigate('AudioImportScreen', {
+        lessonId: selectedLesson.id,
+        name: chapterName.trim(),
+        description: description.trim() || undefined,
+      });
+      return;
+    }
+
+    if (!textContent.trim()) {
+      Alert.alert('Erreur', 'Veuillez coller le contenu texte du cours.');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const chapter = await createChapterFromText({
+        lessonId: selectedLesson.id,
+        name: chapterName.trim(),
+        description: description.trim() || undefined,
+        textInput: textContent.trim(),
+      });
+      navigation.navigate('ProcessingScreen', { chapterId: chapter.id });
+    } catch (_err) {
+      Alert.alert('Erreur', 'Impossible de créer le chapitre. Vérifiez votre backend.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={Colors.accent.blue} />
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <Ionicons name="warning" size={36} color={Colors.accent.red} />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={() => navigation.goBack()}>
+          <Text style={styles.retryText}>Retour</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -67,17 +158,16 @@ export const CreateChapterScreen: React.FC = () => {
         <Text style={styles.title}>Nouveau chapitre</Text>
         <TouchableOpacity 
           onPress={handleCreate}
-          style={[styles.saveButton, !chapterName.trim() && styles.saveButtonDisabled]}
-          disabled={!chapterName.trim()}
+          style={[styles.saveButton, (!chapterName.trim() || !selectedLesson || isSubmitting) && styles.saveButtonDisabled]}
+          disabled={!chapterName.trim() || !selectedLesson || isSubmitting}
         >
-          <Text style={[styles.saveButtonText, !chapterName.trim() && styles.saveButtonTextDisabled]}>
-            {hasAudio ? 'Continuer' : 'Créer'}
+          <Text style={[styles.saveButtonText, (!chapterName.trim() || !selectedLesson) && styles.saveButtonTextDisabled]}>
+            {hasAudio ? 'Continuer' : isSubmitting ? '...': 'Créer'}
           </Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Prévisualisation */}
         <View style={styles.previewSection}>
           <Text style={styles.sectionTitle}>Aperçu</Text>
           <View style={styles.previewCard}>
@@ -105,15 +195,15 @@ export const CreateChapterScreen: React.FC = () => {
                 </View>
               </View>
             ) : (
-              <View style={styles.emptyState}>
-                <Ionicons name="document-outline" size={32} color={Colors.text.tertiary} />
-                <Text style={styles.emptyStateText}>Chapitre vide - Ajoutez du contenu plus tard</Text>
+              <View style={styles.previewContent}>
+                <Text style={styles.previewSummary}>
+                  Le contenu sera généré à partir du texte que vous fournissez ci-dessous.
+                </Text>
               </View>
             )}
           </View>
         </View>
 
-        {/* Informations de base */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Informations</Text>
           <View style={styles.inputGroup}>
@@ -141,35 +231,54 @@ export const CreateChapterScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Sélection de leçon */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Leçon</Text>
+          <Text style={styles.sectionTitle}>Matière et leçon</Text>
+          <View style={styles.subjectsContainer}>
+            {subjects.map((subject) => (
+              <TouchableOpacity
+                key={subject.id}
+                style={[
+                  styles.subjectOption,
+                  { backgroundColor: subject.color + '15' },
+                  selectedSubject?.id === subject.id && styles.subjectOptionSelected,
+                ]}
+                onPress={() => handleSubjectChange(subject)}
+              >
+                <View style={[styles.subjectIcon, { backgroundColor: subject.color + '25' }]}>
+                  <Ionicons name="book" size={20} color={subject.color} />
+                </View>
+                <Text style={styles.subjectName}>{subject.name}</Text>
+                {selectedSubject?.id === subject.id && (
+                  <Ionicons name="checkmark-circle" size={20} color={subject.color} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+
           <View style={styles.lessonsContainer}>
-            {mockLessons.map((lesson) => {
-              const subject = getSubjectForLesson(lesson);
-              return (
-                <TouchableOpacity
-                  key={lesson.id}
-                  style={[
-                    styles.lessonOption,
-                    selectedLesson?.id === lesson.id && styles.lessonOptionSelected,
-                  ]}
-                  onPress={() => setSelectedLesson(lesson)}
-                >
-                  <View style={styles.lessonInfo}>
-                    <Text style={styles.lessonName}>{lesson.name}</Text>
-                    <Text style={styles.lessonSubject}>{subject?.name}</Text>
-                  </View>
-                  {selectedLesson?.id === lesson.id && (
-                    <Ionicons name="checkmark-circle" size={20} color={Colors.accent.blue} />
-                  )}
-                </TouchableOpacity>
-              );
-            })}
+            {lessons.map((lesson) => (
+              <TouchableOpacity
+                key={lesson.id}
+                style={[
+                  styles.lessonOption,
+                  selectedLesson?.id === lesson.id && styles.lessonOptionSelected,
+                ]}
+                onPress={() => setSelectedLesson(lesson)}
+              >
+                <View style={styles.lessonInfo}>
+                  <Text style={styles.lessonName}>{lesson.name}</Text>
+                  <Text style={styles.lessonSubtitle}>
+                    {lesson.completedChapters}/{lesson.chaptersCount} chapitres
+                  </Text>
+                </View>
+                {selectedLesson?.id === lesson.id && (
+                  <Ionicons name="checkmark-circle" size={20} color={Colors.accent.blue} />
+                )}
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
-        {/* Options de contenu */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Contenu</Text>
           <View style={styles.contentOptions}>
@@ -185,10 +294,10 @@ export const CreateChapterScreen: React.FC = () => {
               </View>
               <View style={styles.contentOptionContent}>
                 <Text style={[styles.contentOptionTitle, !hasAudio && styles.contentOptionTitleSelected]}>
-                  Chapitre vide
+                  Coller un texte
                 </Text>
                 <Text style={styles.contentOptionSubtitle}>
-                  Créer un chapitre sans contenu pour l'instant
+                  Générer le chapitre à partir d'un texte existant
                 </Text>
               </View>
               {!hasAudio && (
@@ -204,21 +313,36 @@ export const CreateChapterScreen: React.FC = () => {
               onPress={() => setHasAudio(true)}
             >
               <View style={styles.contentOptionIcon}>
-                <Ionicons name="musical-notes" size={24} color={hasAudio ? Colors.accent.green : Colors.text.secondary} />
+                <Ionicons name="mic-outline" size={24} color={hasAudio ? Colors.accent.blue : Colors.text.secondary} />
               </View>
               <View style={styles.contentOptionContent}>
                 <Text style={[styles.contentOptionTitle, hasAudio && styles.contentOptionTitleSelected]}>
                   Importer un audio
                 </Text>
                 <Text style={styles.contentOptionSubtitle}>
-                  Génération automatique du contenu à partir d'un fichier audio
+                  Utiliser un fichier audio pour générer le cours
                 </Text>
               </View>
               {hasAudio && (
-                <Ionicons name="checkmark-circle" size={20} color={Colors.accent.green} />
+                <Ionicons name="checkmark-circle" size={20} color={Colors.accent.blue} />
               )}
             </TouchableOpacity>
           </View>
+
+          {!hasAudio && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Contenu du cours *</Text>
+              <TextInput
+                style={[styles.textInput, styles.textAreaLarge]}
+                value={textContent}
+                onChangeText={setTextContent}
+                placeholder="Collez ici le texte du cours ou de la transcription..."
+                placeholderTextColor={Colors.text.tertiary}
+                multiline
+                numberOfLines={10}
+              />
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -229,6 +353,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
   },
   header: {
     flexDirection: 'row',
@@ -252,10 +381,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     backgroundColor: Colors.accent.blue,
-    borderRadius: 12,
+    borderRadius: 20,
   },
   saveButtonDisabled: {
-    backgroundColor: Colors.gray[300],
+    backgroundColor: Colors.gray[200],
   },
   saveButtonText: {
     ...Typography.subheadline,
@@ -266,14 +395,13 @@ const styles = StyleSheet.create({
     color: Colors.text.tertiary,
   },
   content: {
-    flex: 1,
     padding: 24,
   },
-  previewSection: {
-    marginBottom: 32,
-  },
   section: {
-    marginBottom: 32,
+    marginBottom: 24,
+  },
+  previewSection: {
+    marginBottom: 24,
   },
   sectionTitle: {
     ...Typography.title3,
@@ -284,10 +412,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: 20,
+    gap: 16,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -296,15 +425,13 @@ const styles = StyleSheet.create({
   previewName: {
     ...Typography.headline,
     color: Colors.text.primary,
-    marginBottom: 16,
   },
   previewContent: {
-    gap: 16,
+    gap: 12,
   },
   previewSummary: {
-    ...Typography.subheadline,
+    ...Typography.body,
     color: Colors.text.secondary,
-    lineHeight: 20,
   },
   previewFeatures: {
     flexDirection: 'row',
@@ -319,36 +446,64 @@ const styles = StyleSheet.create({
     ...Typography.footnote,
     color: Colors.text.secondary,
   },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  emptyStateText: {
-    ...Typography.subheadline,
-    color: Colors.text.tertiary,
-    marginTop: 8,
-  },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   inputLabel: {
     ...Typography.subheadline,
-    color: Colors.text.primary,
+    color: Colors.text.secondary,
     marginBottom: 8,
-    fontWeight: '600',
   },
   textInput: {
     backgroundColor: Colors.surface,
     borderRadius: 12,
-    padding: 16,
-    ...Typography.body,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     color: Colors.text.primary,
-    borderWidth: 1,
-    borderColor: Colors.gray[200],
   },
   textArea: {
-    height: 80,
+    height: 100,
     textAlignVertical: 'top',
+  },
+  textAreaLarge: {
+    minHeight: 200,
+    textAlignVertical: 'top',
+  },
+  subjectsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  subjectOption: {
+    width: '48%',
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  subjectOptionSelected: {
+    borderWidth: 2,
+    borderColor: Colors.accent.blue,
+  },
+  subjectIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  subjectName: {
+    ...Typography.subheadline,
+    color: Colors.text.primary,
+    fontWeight: '600',
   },
   lessonsContainer: {
     gap: 12,
@@ -356,59 +511,98 @@ const styles = StyleSheet.create({
   lessonOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    justifyContent: 'space-between',
     padding: 16,
     borderRadius: 16,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    backgroundColor: Colors.surface,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   lessonOptionSelected: {
+    borderWidth: 2,
     borderColor: Colors.accent.blue,
   },
   lessonInfo: {
     flex: 1,
+    marginRight: 12,
   },
   lessonName: {
-    ...Typography.headline,
+    ...Typography.subheadline,
     color: Colors.text.primary,
-    marginBottom: 4,
+    fontWeight: '600',
   },
-  lessonSubject: {
+  lessonSubtitle: {
     ...Typography.footnote,
     color: Colors.text.secondary,
   },
   contentOptions: {
     gap: 12,
+    marginBottom: 12,
   },
   contentOption: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
-    padding: 20,
     borderRadius: 16,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    padding: 16,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   contentOptionSelected: {
+    borderWidth: 2,
     borderColor: Colors.accent.blue,
   },
   contentOptionIcon: {
-    marginRight: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.gray[100],
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   contentOptionContent: {
     flex: 1,
+    gap: 4,
   },
   contentOptionTitle: {
-    ...Typography.headline,
-    color: Colors.text.primary,
-    marginBottom: 4,
+    ...Typography.subheadline,
+    color: Colors.text.secondary,
+    fontWeight: '600',
   },
   contentOptionTitleSelected: {
-    color: Colors.accent.blue,
+    color: Colors.text.primary,
   },
   contentOptionSubtitle: {
     ...Typography.footnote,
-    color: Colors.text.secondary,
-    lineHeight: 18,
+    color: Colors.text.tertiary,
+  },
+  errorText: {
+    ...Typography.subheadline,
+    color: Colors.accent.red,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: Colors.accent.blue,
+    borderRadius: 24,
+  },
+  retryText: {
+    ...Typography.footnote,
+    color: Colors.surface,
   },
 });

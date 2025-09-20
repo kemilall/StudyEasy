@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,14 +7,16 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { mockQuizQuestions } from '../data/mockData';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { RootStackParamList } from '../navigation/types';
+import { QuizQuestion } from '../types';
+import { fetchQuiz } from '../api/backend';
 
 type QuizScreenRouteProp = RouteProp<RootStackParamList, 'Quiz'>;
 type QuizScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Quiz'>;
@@ -22,17 +24,39 @@ type QuizScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Quiz'>;
 export const QuizScreen: React.FC = () => {
   const navigation = useNavigation<QuizScreenNavigationProp>();
   const route = useRoute<QuizScreenRouteProp>();
+  const { chapterId } = route.params;
+
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [score, setScore] = useState(0);
-  const [answers, setAnswers] = useState<(number | null)[]>(
-    new Array(mockQuizQuestions.length).fill(null)
-  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const questions = mockQuizQuestions;
+  const loadQuiz = useCallback(async () => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      const data = await fetchQuiz(chapterId);
+      setQuestions(data);
+      setCurrentIndex(0);
+      setSelectedAnswer(null);
+      setShowExplanation(false);
+      setScore(0);
+    } catch (_err) {
+      setError('Impossible de charger le quiz.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [chapterId]);
+
+  useEffect(() => {
+    loadQuiz();
+  }, [loadQuiz]);
+
   const currentQuestion = questions[currentIndex];
-  const isLastQuestion = currentIndex === questions.length - 1;
+  const isLastQuestion = questions.length > 0 && currentIndex === questions.length - 1;
 
   const handleSelectAnswer = (index: number) => {
     if (!showExplanation) {
@@ -46,41 +70,58 @@ export const QuizScreen: React.FC = () => {
       return;
     }
 
-    const newAnswers = [...answers];
-    newAnswers[currentIndex] = selectedAnswer;
-    setAnswers(newAnswers);
-
-    if (selectedAnswer === currentQuestion.correctAnswer) {
-      setScore(score + 1);
-    }
-
     setShowExplanation(true);
   };
 
   const handleNext = () => {
     if (isLastQuestion) {
+      const finalScore = score + (selectedAnswer === currentQuestion.correctAnswer ? 1 : 0);
+      setScore(finalScore);
       Alert.alert(
         'Quiz terminé!',
-        `Votre score: ${score}/${questions.length}`,
+        `Votre score: ${finalScore}/${questions.length}`,
         [
-          { text: 'Recommencer', onPress: handleRestart },
-          { text: 'Terminer', onPress: () => navigation.goBack() }
+          { text: 'Recommencer', onPress: loadQuiz },
+          { text: 'Fermer', onPress: () => navigation.goBack() },
         ]
       );
     } else {
-      setCurrentIndex(currentIndex + 1);
+      const newScore = score + (selectedAnswer === currentQuestion.correctAnswer ? 1 : 0);
+      setScore(newScore);
+      setCurrentIndex((prev) => prev + 1);
       setSelectedAnswer(null);
       setShowExplanation(false);
     }
   };
 
-  const handleRestart = () => {
-    setCurrentIndex(0);
-    setSelectedAnswer(null);
-    setShowExplanation(false);
-    setScore(0);
-    setAnswers(new Array(questions.length).fill(null));
-  };
+  if (isLoading && questions.length === 0) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={Colors.accent.blue} />
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <Ionicons name="warning" size={36} color={Colors.accent.red} />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={loadQuiz}>
+          <Text style={styles.retryText}>Réessayer</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  if (!currentQuestion) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <Ionicons name="help-circle-outline" size={32} color={Colors.text.tertiary} />
+        <Text style={styles.emptyText}>Aucune question disponible pour ce chapitre.</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -200,6 +241,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 32,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -219,9 +267,8 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
   },
   score: {
-    ...Typography.subheadline,
+    ...Typography.footnote,
     color: Colors.text.secondary,
-    fontWeight: '600',
   },
   progressContainer: {
     paddingHorizontal: 24,
@@ -249,26 +296,26 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: 24,
-    paddingVertical: 32,
+    paddingBottom: 120,
+    gap: 24,
   },
   question: {
     ...Typography.title2,
     color: Colors.text.primary,
-    marginBottom: 32,
-    lineHeight: 32,
+    lineHeight: 28,
   },
   optionsContainer: {
     gap: 12,
   },
   option: {
     backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 20,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderWidth: 2,
-    borderColor: 'transparent',
   },
   optionSelected: {
     borderColor: Colors.accent.blue,
@@ -282,67 +329,82 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent.red + '10',
   },
   optionText: {
-    ...Typography.body,
+    ...Typography.subheadline,
     color: Colors.text.primary,
     flex: 1,
   },
   optionTextSelected: {
     color: Colors.accent.blue,
-    fontWeight: '600',
   },
   optionTextCorrect: {
     color: Colors.accent.green,
-    fontWeight: '600',
   },
   optionTextIncorrect: {
     color: Colors.accent.red,
-    fontWeight: '600',
   },
   explanationContainer: {
-    marginTop: 32,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
     padding: 20,
-    backgroundColor: Colors.gray[100],
-    borderRadius: 12,
+    gap: 8,
   },
   explanationTitle: {
     ...Typography.headline,
     color: Colors.text.primary,
-    marginBottom: 8,
   },
   explanationText: {
     ...Typography.body,
     color: Colors.text.secondary,
-    lineHeight: 22,
+    lineHeight: 24,
   },
   footer: {
-    padding: 24,
-    borderTopWidth: 1,
-    borderTopColor: Colors.gray[200],
+    paddingHorizontal: 24,
+    paddingBottom: 24,
   },
   validateButton: {
     backgroundColor: Colors.accent.blue,
-    borderRadius: 12,
-    padding: 16,
+    paddingVertical: 16,
+    borderRadius: 16,
     alignItems: 'center',
   },
   validateButtonDisabled: {
-    backgroundColor: Colors.gray[300],
+    backgroundColor: Colors.gray[200],
   },
   validateButtonText: {
     ...Typography.headline,
-    color: Colors.text.inverse,
+    color: Colors.surface,
   },
   validateButtonTextDisabled: {
     color: Colors.text.tertiary,
   },
   nextButton: {
     backgroundColor: Colors.accent.green,
-    borderRadius: 12,
-    padding: 16,
+    paddingVertical: 16,
+    borderRadius: 16,
     alignItems: 'center',
   },
   nextButtonText: {
     ...Typography.headline,
-    color: Colors.text.inverse,
+    color: Colors.surface,
+  },
+  errorText: {
+    ...Typography.subheadline,
+    color: Colors.accent.red,
+    textAlign: 'center',
+  },
+  retryButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: Colors.accent.blue,
+    borderRadius: 24,
+  },
+  retryText: {
+    ...Typography.footnote,
+    color: Colors.surface,
+  },
+  emptyText: {
+    ...Typography.subheadline,
+    color: Colors.text.secondary,
+    textAlign: 'center',
   },
 });

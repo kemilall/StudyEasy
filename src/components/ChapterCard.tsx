@@ -12,8 +12,11 @@ interface ChapterCardProps {
 }
 
 export const ChapterCard: React.FC<ChapterCardProps> = ({ chapter, onPress, onUpload }) => {
+  const isProcessing = chapter.isProcessing || chapter.status === 'processing' || chapter.status === 'pending';
+  const isFailed = chapter.status === 'failed';
+
   const renderContent = () => {
-    if (chapter.isProcessing) {
+    if (isProcessing) {
       return (
         <View style={styles.processingContainer}>
           <ActivityIndicator size="small" color={Colors.accent.blue} />
@@ -22,7 +25,29 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({ chapter, onPress, onUp
       );
     }
 
+    if (isFailed) {
+      return (
+        <View style={styles.errorContainer}>
+          <Ionicons name="warning-outline" size={20} color={Colors.accent.red} />
+          <View style={styles.errorContent}>
+            <Text style={styles.errorTitle}>Génération échouée</Text>
+            <Text style={styles.errorMessage} numberOfLines={2}>
+              {chapter.failureReason || 'Une erreur est survenue durant le traitement.'}
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
     if (!chapter.summary) {
+      if (!onUpload) {
+        return (
+          <View style={styles.emptyPlaceholder}>
+            <Ionicons name="document-outline" size={22} color={Colors.text.tertiary} />
+            <Text style={styles.emptyPlaceholderText}>Contenu à générer prochainement</Text>
+          </View>
+        );
+      }
       return (
         <TouchableOpacity 
           style={styles.uploadButton}
@@ -113,6 +138,27 @@ const styles = StyleSheet.create({
     ...Typography.subheadline,
     color: Colors.text.secondary,
   },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: Colors.accent.red + '10',
+    borderRadius: 12,
+    padding: 16,
+  },
+  errorContent: {
+    flex: 1,
+  },
+  errorTitle: {
+    ...Typography.subheadline,
+    color: Colors.accent.red,
+    marginBottom: 4,
+    fontWeight: '600',
+  },
+  errorMessage: {
+    ...Typography.footnote,
+    color: Colors.text.secondary,
+  },
   uploadButton: {
     flexDirection: 'column',
     alignItems: 'center',
@@ -127,6 +173,20 @@ const styles = StyleSheet.create({
   uploadText: {
     ...Typography.subheadline,
     color: Colors.accent.blue,
+  },
+  emptyPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: Colors.gray[200],
+    borderRadius: 12,
+    borderStyle: 'dashed',
+    paddingVertical: 28,
+    gap: 8,
+  },
+  emptyPlaceholderText: {
+    ...Typography.footnote,
+    color: Colors.text.secondary,
   },
   contentContainer: {
     gap: 12,
