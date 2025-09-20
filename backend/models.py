@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from uuid import uuid4
 
 from sqlalchemy import Column, Enum as SAEnum, ForeignKey, JSON, String
+from sqlalchemy.orm import Mapped
 from sqlmodel import Field, Relationship, SQLModel
 
 from .config import ChapterSource, ChapterStatus
@@ -19,7 +20,7 @@ class SubjectModel(SQLModel, table=True):
     description: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    lessons: List["LessonModel"] = Relationship(back_populates="subject", sa_relationship_kwargs={"cascade": "all, delete"})
+    lessons: Mapped[List["LessonModel"]] = Relationship(back_populates="subject", sa_relationship_kwargs={"cascade": "all, delete"})
 
 
 class LessonModel(SQLModel, table=True):
@@ -31,8 +32,8 @@ class LessonModel(SQLModel, table=True):
     description: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    subject: SubjectModel = Relationship(back_populates="lessons")
-    chapters: List["ChapterModel"] = Relationship(back_populates="lesson", sa_relationship_kwargs={"cascade": "all, delete"})
+    subject: Mapped[SubjectModel] = Relationship(back_populates="lessons")
+    chapters: Mapped[List["ChapterModel"]] = Relationship(back_populates="lesson", sa_relationship_kwargs={"cascade": "all, delete"})
 
 
 class ChapterModel(SQLModel, table=True):
@@ -63,10 +64,10 @@ class ChapterModel(SQLModel, table=True):
     processing_started_at: Optional[datetime] = Field(default=None)
     completed_at: Optional[datetime] = Field(default=None)
 
-    lesson: LessonModel = Relationship(back_populates="chapters")
-    flashcards: List["FlashcardModel"] = Relationship(back_populates="chapter", sa_relationship_kwargs={"cascade": "all, delete"})
-    quiz_questions: List["QuizQuestionModel"] = Relationship(back_populates="chapter", sa_relationship_kwargs={"cascade": "all, delete"})
-    chat_history: List["ChatMessageModel"] = Relationship(back_populates="chapter", sa_relationship_kwargs={"cascade": "all, delete"})
+    lesson: Mapped[LessonModel] = Relationship(back_populates="chapters")
+    flashcards: Mapped[List["FlashcardModel"]] = Relationship(back_populates="chapter", sa_relationship_kwargs={"cascade": "all, delete"})
+    quiz_questions: Mapped[List["QuizQuestionModel"]] = Relationship(back_populates="chapter", sa_relationship_kwargs={"cascade": "all, delete"})
+    chat_history: Mapped[List["ChatMessageModel"]] = Relationship(back_populates="chapter", sa_relationship_kwargs={"cascade": "all, delete"})
 
 
 class FlashcardModel(SQLModel, table=True):
@@ -78,7 +79,7 @@ class FlashcardModel(SQLModel, table=True):
     answer: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    chapter: ChapterModel = Relationship(back_populates="flashcards")
+    chapter: Mapped[ChapterModel] = Relationship(back_populates="flashcards")
 
 
 class QuizQuestionModel(SQLModel, table=True):
@@ -92,7 +93,7 @@ class QuizQuestionModel(SQLModel, table=True):
     explanation: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    chapter: ChapterModel = Relationship(back_populates="quiz_questions")
+    chapter: Mapped[ChapterModel] = Relationship(back_populates="quiz_questions")
 
 
 class ChatMessageModel(SQLModel, table=True):
@@ -104,4 +105,4 @@ class ChatMessageModel(SQLModel, table=True):
     content: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    chapter: ChapterModel = Relationship(back_populates="chat_history")
+    chapter: Mapped[ChapterModel] = Relationship(back_populates="chat_history")
