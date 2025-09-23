@@ -14,6 +14,7 @@ import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { useAuth } from '../contexts/AuthContext';
 import { DataService } from '../services/dataService';
+import { ConfirmationModal } from '../components/ConfirmationModal';
 import { Chapter } from '../types';
 
 export const ChapterScreen: React.FC = () => {
