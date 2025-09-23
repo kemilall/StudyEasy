@@ -8,11 +8,14 @@ import {
   TextInput,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
+import { useAuth } from '../contexts/AuthContext';
+import { DataService } from '../services/dataService';
 
 const SUBJECT_COLORS = [
   Colors.accent.blue,
@@ -31,28 +34,50 @@ const SUBJECT_ICONS = [
   'telescope',
   'language',
   'musical-notes',
-  'palette',
+  'brush',
   'fitness',
 ];
 
 export const CreateSubjectScreen: React.FC = () => {
   const navigation = useNavigation();
+  const { user } = useAuth();
   const [subjectName, setSubjectName] = useState('');
   const [selectedColor, setSelectedColor] = useState(SUBJECT_COLORS[0]);
   const [selectedIcon, setSelectedIcon] = useState(SUBJECT_ICONS[0]);
   const [description, setDescription] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!subjectName.trim()) {
       Alert.alert('Erreur', 'Veuillez entrer un nom pour la matière.');
       return;
     }
 
-    Alert.alert(
-      'Matière créée !',
-      `La matière "${subjectName}" a été créée avec succès.`,
-      [{ text: 'OK', onPress: () => navigation.goBack() }]
-    );
+    if (!user) {
+      Alert.alert('Erreur', 'Vous devez être connecté pour créer une matière.');
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      await DataService.createSubject(user.uid, {
+        name: subjectName.trim(),
+        color: selectedColor,
+        lessonsCount: 0,
+        completedLessons: 0,
+      });
+
+      Alert.alert(
+        'Matière créée !',
+        `La matière "${subjectName}" a été créée avec succès.`,
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+    } catch (error) {
+      console.error('Error creating subject:', error);
+      Alert.alert('Erreur', 'Impossible de créer la matière. Veuillez réessayer.');
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (
@@ -67,12 +92,16 @@ export const CreateSubjectScreen: React.FC = () => {
         <Text style={styles.title}>Nouvelle matière</Text>
         <TouchableOpacity 
           onPress={handleCreate}
-          style={[styles.saveButton, !subjectName.trim() && styles.saveButtonDisabled]}
-          disabled={!subjectName.trim()}
+          style={[styles.saveButton, (!subjectName.trim() || isCreating) && styles.saveButtonDisabled]}
+          disabled={!subjectName.trim() || isCreating}
         >
-          <Text style={[styles.saveButtonText, !subjectName.trim() && styles.saveButtonTextDisabled]}>
-            Créer
-          </Text>
+          {isCreating ? (
+            <ActivityIndicator size="small" color={Colors.surface} />
+          ) : (
+            <Text style={[styles.saveButtonText, (!subjectName.trim() || isCreating) && styles.saveButtonTextDisabled]}>
+              Créer
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
 

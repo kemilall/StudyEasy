@@ -1,52 +1,127 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  Dimensions,
-  ScrollView,
+  Animated,
+  PanGesturer,
+  ActivityIndicator,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { mockFlashcards } from '../data/mockData';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
-import { RootStackParamList } from '../navigation/types';
-
-type FlashcardsScreenRouteProp = RouteProp<RootStackParamList, 'Flashcards'>;
-type FlashcardsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Flashcards'>;
-
-const { width } = Dimensions.get('window');
+import { useAuth } from '../contexts/AuthContext';
+import { DataService } from '../services/dataService';
+import { Chapter, Flashcard } from '../types';
 
 export const FlashcardsScreen: React.FC = () => {
-  const navigation = useNavigation<FlashcardsScreenNavigationProp>();
-  const route = useRoute<FlashcardsScreenRouteProp>();
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { user } = useAuth();
+  const { chapterId } = route.params as { chapterId: string };
+  
+  const [chapter, setChapter] = useState<Chapter | null>(null);
+  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isRevealed, setIsRevealed] = useState(false);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const flipAnimation = new Animated.Value(0);
 
-  const flashcards = mockFlashcards;
-  const currentCard = flashcards[currentIndex];
+  useEffect(() => {
+    if (!user || !chapterId) return;
 
-  const handleNext = () => {
+    const loadChapter = async () => {
+      try {
+        const chapterData = await DataService.getChapter(chapterId);
+        setChapter(chapterData);
+        if (chapterData?.flashcards) {
+          setFlashcards(chapterData.flashcards);
+        }
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error loading chapter:', error);
+        setIsLoading(false);
+      }
+    };
+
+    loadChapter();
+  }, [user, chapterId]);
+
+  const flipCard = () => {
+    if (isFlipped) {
+      Animated.spring(flipAnimation, {
+        toValue: 0,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.spring(flipAnimation, {
+        toValue: 1,
+        useNativeDriver: true,
+      }).start();
+    }
+    setIsFlipped(!isFlipped);
+  };
+
+  const nextCard = () => {
     if (currentIndex < flashcards.length - 1) {
       setCurrentIndex(currentIndex + 1);
-      setIsRevealed(false);
+      setIsFlipped(false);
+      flipAnimation.setValue(0);
     }
   };
 
-  const handlePrevious = () => {
+  const previousCard = () => {
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
-      setIsRevealed(false);
+      setIsFlipped(false);
+      flipAnimation.setValue(0);
     }
   };
 
-  const handleReveal = () => {
-    setIsRevealed(!isRevealed);
-  };
+  const frontInterpolate = flipAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+
+  const backInterpolate = flipAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['180deg', '360deg'],
+  });
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.accent.blue} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!chapter || !flashcards.length) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="albums-outline" size={64} color={Colors.text.tertiary} />
+          <Text style={styles.errorTitle}>Aucune flashcard</Text>
+          <Text style={styles.errorSubtitle}>
+            Les flashcards de ce chapitre ne sont pas encore prêtes
+          </Text>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>Retour</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const currentCard = flashcards[currentIndex];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -57,9 +132,7 @@ export const FlashcardsScreen: React.FC = () => {
         >
           <Ionicons name="close" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
-        
         <Text style={styles.title}>Flashcards</Text>
-        
         <View style={styles.placeholder} />
       </View>
 
@@ -77,45 +150,44 @@ export const FlashcardsScreen: React.FC = () => {
         </View>
       </View>
 
-      <ScrollView 
-        style={styles.cardContainer}
-        contentContainerStyle={styles.cardContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <TouchableOpacity
-          style={styles.card}
-          onPress={handleReveal}
-          activeOpacity={0.9}
-        >
-          <View style={styles.cardInner}>
-            <Text style={styles.cardLabel}>
-              {isRevealed ? 'Réponse' : 'Question'}
-            </Text>
-            <Text style={styles.cardText}>
-              {isRevealed ? currentCard.answer : currentCard.question}
-            </Text>
-          </View>
-          
-          <View style={styles.tapHint}>
-            <Ionicons 
-              name="hand-left-outline" 
-              size={20} 
-              color={Colors.text.tertiary} 
-            />
-            <Text style={styles.tapHintText}>
-              Toucher pour {isRevealed ? 'voir la question' : 'révéler'}
-            </Text>
-          </View>
+      <View style={styles.cardContainer}>
+        <TouchableOpacity style={styles.cardTouchable} onPress={flipCard}>
+          <Animated.View 
+            style={[
+              styles.card, 
+              styles.cardFront,
+              { transform: [{ rotateY: frontInterpolate }] }
+            ]}
+          >
+            <View style={styles.cardContent}>
+              <Text style={styles.cardLabel}>Question</Text>
+              <Text style={styles.cardText}>{currentCard.question}</Text>
+            </View>
+            <View style={styles.flipHint}>
+              <Ionicons name="refresh" size={20} color={Colors.text.tertiary} />
+              <Text style={styles.flipHintText}>Touchez pour révéler</Text>
+            </View>
+          </Animated.View>
+
+          <Animated.View 
+            style={[
+              styles.card, 
+              styles.cardBack,
+              { transform: [{ rotateY: backInterpolate }] }
+            ]}
+          >
+            <View style={styles.cardContent}>
+              <Text style={styles.cardLabel}>Réponse</Text>
+              <Text style={styles.cardText}>{currentCard.answer}</Text>
+            </View>
+          </Animated.View>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
 
       <View style={styles.controls}>
-        <TouchableOpacity
-          style={[
-            styles.controlButton,
-            currentIndex === 0 && styles.controlButtonDisabled
-          ]}
-          onPress={handlePrevious}
+        <TouchableOpacity 
+          style={[styles.controlButton, currentIndex === 0 && styles.controlButtonDisabled]}
+          onPress={previousCard}
           disabled={currentIndex === 0}
         >
           <Ionicons 
@@ -123,28 +195,18 @@ export const FlashcardsScreen: React.FC = () => {
             size={24} 
             color={currentIndex === 0 ? Colors.text.tertiary : Colors.text.primary} 
           />
-          <Text style={[
-            styles.controlText,
-            currentIndex === 0 && styles.controlTextDisabled
-          ]}>
-            Précédent
-          </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.controlButton,
-            currentIndex === flashcards.length - 1 && styles.controlButtonDisabled
-          ]}
-          onPress={handleNext}
+        <TouchableOpacity style={styles.flipButton} onPress={flipCard}>
+          <Ionicons name="refresh" size={24} color={Colors.accent.blue} />
+          <Text style={styles.flipButtonText}>Retourner</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.controlButton, currentIndex === flashcards.length - 1 && styles.controlButtonDisabled]}
+          onPress={nextCard}
           disabled={currentIndex === flashcards.length - 1}
         >
-          <Text style={[
-            styles.controlText,
-            currentIndex === flashcards.length - 1 && styles.controlTextDisabled
-          ]}>
-            Suivant
-          </Text>
           <Ionicons 
             name="chevron-forward" 
             size={24} 
@@ -167,6 +229,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 24,
     paddingVertical: 16,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.gray[200],
   },
@@ -182,22 +245,55 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 40,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  errorTitle: {
+    ...Typography.title2,
+    color: Colors.text.primary,
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  errorSubtitle: {
+    ...Typography.body,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  backButton: {
+    backgroundColor: Colors.accent.blue,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  backButtonText: {
+    ...Typography.headline,
+    color: Colors.surface,
+    fontWeight: '600',
+  },
   progressContainer: {
     paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 16,
+    paddingVertical: 16,
   },
   progressText: {
-    ...Typography.footnote,
+    ...Typography.subheadline,
     color: Colors.text.secondary,
-    marginBottom: 8,
     textAlign: 'center',
+    marginBottom: 8,
   },
   progressBar: {
     height: 4,
     backgroundColor: Colors.gray[200],
     borderRadius: 2,
-    overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
@@ -206,17 +302,20 @@ const styles = StyleSheet.create({
   },
   cardContainer: {
     flex: 1,
-  },
-  cardContent: {
-    flexGrow: 1,
     paddingHorizontal: 24,
-    paddingVertical: 32,
+    justifyContent: 'center',
+  },
+  cardTouchable: {
+    height: 400,
   },
   card: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
     backgroundColor: Colors.surface,
     borderRadius: 20,
     padding: 32,
-    minHeight: 300,
+    justifyContent: 'space-between',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -224,61 +323,73 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.1,
     shadowRadius: 12,
-    elevation: 4,
+    elevation: 5,
+    backfaceVisibility: 'hidden',
   },
-  cardInner: {
+  cardFront: {
+    backgroundColor: Colors.surface,
+  },
+  cardBack: {
+    backgroundColor: Colors.accent.blue + '10',
+  },
+  cardContent: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
   },
   cardLabel: {
-    ...Typography.caption1,
-    color: Colors.text.tertiary,
+    ...Typography.subheadline,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: 16,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: 24,
   },
   cardText: {
-    ...Typography.title2,
+    ...Typography.title3,
     color: Colors.text.primary,
     textAlign: 'center',
     lineHeight: 32,
   },
-  tapHint: {
+  flipHint: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingTop: 24,
   },
-  tapHintText: {
+  flipHintText: {
     ...Typography.caption1,
     color: Colors.text.tertiary,
   },
   controls: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingVertical: 24,
+    paddingBottom: 32,
   },
   controlButton: {
-    flexDirection: 'row',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.surface,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    backgroundColor: Colors.gray[100],
   },
   controlButtonDisabled: {
-    opacity: 0.5,
+    backgroundColor: Colors.gray[100],
   },
-  controlText: {
+  flipButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.accent.blue + '15',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+    gap: 8,
+  },
+  flipButtonText: {
     ...Typography.subheadline,
-    color: Colors.text.primary,
+    color: Colors.accent.blue,
     fontWeight: '600',
-  },
-  controlTextDisabled: {
-    color: Colors.text.tertiary,
   },
 });

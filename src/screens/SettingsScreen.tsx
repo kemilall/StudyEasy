@@ -7,14 +7,38 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
+import { useAuth } from '../contexts/AuthContext';
 
 export const SettingsScreen: React.FC = () => {
+  const { userProfile, signOut } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = React.useState(false);
+
+  const handleSignOut = () => {
+    Alert.alert(
+      'Déconnexion',
+      'Êtes-vous sûr de vouloir vous déconnecter ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { 
+          text: 'Déconnexion', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await signOut();
+            } catch (error) {
+              Alert.alert('Erreur', 'Impossible de se déconnecter');
+            }
+          }
+        },
+      ]
+    );
+  };
 
   const settingsSections = [
     {
@@ -23,13 +47,13 @@ export const SettingsScreen: React.FC = () => {
         {
           icon: 'person-outline',
           label: 'Profil',
-          value: 'Étudiant',
+          value: userProfile?.displayName || 'Utilisateur',
           onPress: () => {},
         },
         {
           icon: 'mail-outline',
           label: 'Email',
-          value: 'etudiant@example.com',
+          value: userProfile?.email || 'Non disponible',
           onPress: () => {},
         },
       ],
@@ -142,7 +166,7 @@ export const SettingsScreen: React.FC = () => {
           </View>
         ))}
 
-        <TouchableOpacity style={styles.logoutButton} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.logoutButton} activeOpacity={0.8} onPress={handleSignOut}>
           <Text style={styles.logoutText}>Se déconnecter</Text>
         </TouchableOpacity>
 

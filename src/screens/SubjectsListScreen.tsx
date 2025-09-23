@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,22 +6,39 @@ import {
   FlatList,
   SafeAreaView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { SubjectCard } from '../components/SubjectCard';
-import { mockSubjects } from '../data/mockData';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { SubjectsStackParamList } from '../navigation/types';
+import { useAuth } from '../contexts/AuthContext';
+import { DataService } from '../services/dataService';
+import { Subject } from '../types';
 
 type SubjectsListNavigationProp = StackNavigationProp<SubjectsStackParamList, 'SubjectsList'>;
 
 export const SubjectsListScreen: React.FC = () => {
   const navigation = useNavigation<SubjectsListNavigationProp>();
+  const { user } = useAuth();
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const renderSubject = ({ item }: { item: typeof mockSubjects[0] }) => (
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubscribe = DataService.subscribeToUserSubjects(user.uid, (userSubjects) => {
+      setSubjects(userSubjects);
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const renderSubject = ({ item }: { item: Subject }) => (
     <SubjectCard
       subject={item}
       onPress={() => navigation.navigate('Subject', { subjectId: item.id })}
@@ -40,7 +57,7 @@ export const SubjectsListScreen: React.FC = () => {
       <TouchableOpacity 
         style={styles.createSubjectButton} 
         activeOpacity={0.8}
-        onPress={() => navigation.navigate('CreateSubjectScreen' as never)}
+        onPress={() => navigation.navigate('CreateSubject' as never)}
       >
         <View style={styles.createSubjectIcon}>
           <Ionicons name="add" size={24} color={Colors.accent.blue} />
@@ -52,15 +69,27 @@ export const SubjectsListScreen: React.FC = () => {
         <Ionicons name="arrow-forward" size={20} color={Colors.text.tertiary} />
       </TouchableOpacity>
 
-      <FlatList
-        data={mockSubjects}
-        renderItem={renderSubject}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        columnWrapperStyle={styles.row}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.accent.blue} />
+        </View>
+      ) : subjects.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="library-outline" size={64} color={Colors.text.tertiary} />
+          <Text style={styles.emptyTitle}>Aucune matière</Text>
+          <Text style={styles.emptySubtitle}>Créez votre première matière pour commencer vos études</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={subjects}
+          renderItem={renderSubject}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          columnWrapperStyle={styles.row}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
 
     </SafeAreaView>
   );
@@ -133,5 +162,28 @@ const styles = StyleSheet.create({
   createSubjectSubtitle: {
     ...Typography.subheadline,
     color: Colors.text.secondary,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    ...Typography.title2,
+    color: Colors.text.primary,
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    ...Typography.body,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });

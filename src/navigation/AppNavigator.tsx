@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { ActivityIndicator, View } from 'react-native';
 import { RootStackParamList, MainTabParamList, SubjectsStackParamList } from './types';
 import { HomeScreen } from '../screens/HomeScreen';
 import { SubjectsListScreen } from '../screens/SubjectsListScreen';
@@ -19,6 +20,9 @@ import { CreateSubjectScreen } from '../screens/CreateSubjectScreen';
 import { CreateLessonScreen } from '../screens/CreateLessonScreen';
 import { CreateChapterScreen } from '../screens/CreateChapterScreen';
 import { ProcessingScreen } from '../screens/ProcessingScreen';
+import { LoginScreen } from '../screens/LoginScreen';
+import { SignUpScreen } from '../screens/SignUpScreen';
+import { useAuth } from '../contexts/AuthContext';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 
@@ -108,81 +112,106 @@ const MainTabs = () => {
   );
 };
 
+const AuthStack = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="SignUp" component={SignUpScreen} />
+    </Stack.Navigator>
+  );
+};
+
+const AppStack = () => {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        cardStyle: { backgroundColor: Colors.background },
+      }}
+    >
+      <Stack.Screen name="MainTabs" component={MainTabs} />
+      <Stack.Screen name="Chapter" component={ChapterScreen} />
+      <Stack.Screen 
+        name="Transcription" 
+        component={TranscriptionScreen}
+        options={{
+          presentation: 'modal',
+        }}
+      />
+      <Stack.Screen 
+        name="Flashcards" 
+        component={FlashcardsScreen}
+        options={{
+          presentation: 'modal',
+        }}
+      />
+      <Stack.Screen 
+        name="Quiz" 
+        component={QuizScreen}
+        options={{
+          presentation: 'modal',
+        }}
+      />
+      <Stack.Screen 
+        name="Chat" 
+        component={ChatScreen}
+        options={{
+          presentation: 'modal',
+        }}
+      />
+      <Stack.Screen 
+        name="AudioImport" 
+        component={AudioImportScreen}
+        options={{
+          presentation: 'modal',
+        }}
+      />
+      <Stack.Screen 
+        name="CreateSubject" 
+        component={CreateSubjectScreen}
+        options={{
+          presentation: 'modal',
+        }}
+      />
+      <Stack.Screen 
+        name="CreateLesson" 
+        component={CreateLessonScreen}
+        options={{
+          presentation: 'modal',
+        }}
+      />
+      <Stack.Screen 
+        name="CreateChapter" 
+        component={CreateChapterScreen}
+        options={{
+          presentation: 'modal',
+        }}
+      />
+      <Stack.Screen 
+        name="ProcessingScreen" 
+        component={ProcessingScreen}
+        options={{
+          presentation: 'fullScreenModal',
+        }}
+      />
+    </Stack.Navigator>
+  );
+};
+
 export const AppNavigator: React.FC = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background }}>
+        <ActivityIndicator size="large" color={Colors.accent.blue} />
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-          cardStyle: { backgroundColor: Colors.background },
-        }}
-      >
-        <Stack.Screen name="MainTabs" component={MainTabs} />
-        <Stack.Screen name="Chapter" component={ChapterScreen} />
-        <Stack.Screen 
-          name="Transcription" 
-          component={TranscriptionScreen}
-          options={{
-            presentation: 'modal',
-          }}
-        />
-        <Stack.Screen 
-          name="Flashcards" 
-          component={FlashcardsScreen}
-          options={{
-            presentation: 'modal',
-          }}
-        />
-        <Stack.Screen 
-          name="Quiz" 
-          component={QuizScreen}
-          options={{
-            presentation: 'modal',
-          }}
-        />
-        <Stack.Screen 
-          name="Chat" 
-          component={ChatScreen}
-          options={{
-            presentation: 'modal',
-          }}
-        />
-        <Stack.Screen 
-          name="AudioImportScreen" 
-          component={AudioImportScreen}
-          options={{
-            presentation: 'modal',
-          }}
-        />
-        <Stack.Screen 
-          name="CreateSubjectScreen" 
-          component={CreateSubjectScreen}
-          options={{
-            presentation: 'modal',
-          }}
-        />
-        <Stack.Screen 
-          name="CreateLessonScreen" 
-          component={CreateLessonScreen}
-          options={{
-            presentation: 'modal',
-          }}
-        />
-        <Stack.Screen 
-          name="CreateChapterScreen" 
-          component={CreateChapterScreen}
-          options={{
-            presentation: 'modal',
-          }}
-        />
-        <Stack.Screen 
-          name="ProcessingScreen" 
-          component={ProcessingScreen}
-          options={{
-            presentation: 'fullScreenModal',
-          }}
-        />
-      </Stack.Navigator>
+      {user ? <AppStack /> : <AuthStack />}
     </NavigationContainer>
   );
 };

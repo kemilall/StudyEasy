@@ -1,61 +1,76 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   SafeAreaView,
+  ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { mockChapters } from '../data/mockData';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
-import { RootStackParamList } from '../navigation/types';
-
-type TranscriptionScreenRouteProp = RouteProp<RootStackParamList, 'Transcription'>;
-type TranscriptionScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Transcription'>;
+import { useAuth } from '../contexts/AuthContext';
+import { DataService } from '../services/dataService';
+import { Chapter } from '../types';
 
 export const TranscriptionScreen: React.FC = () => {
-  const navigation = useNavigation<TranscriptionScreenNavigationProp>();
-  const route = useRoute<TranscriptionScreenRouteProp>();
-  const { chapterId } = route.params;
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { user } = useAuth();
+  const { chapterId } = route.params as { chapterId: string };
+  
+  const [chapter, setChapter] = useState<Chapter | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const chapter = mockChapters.find(c => c.id === chapterId);
+  useEffect(() => {
+    if (!user || !chapterId) return;
 
-  if (!chapter || !chapter.transcription) {
-    return null;
+    const loadChapter = async () => {
+      try {
+        const chapterData = await DataService.getChapter(chapterId);
+        setChapter(chapterData);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error loading chapter:', error);
+        setIsLoading(false);
+      }
+    };
+
+    loadChapter();
+  }, [user, chapterId]);
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.accent.blue} />
+        </View>
+      </SafeAreaView>
+    );
   }
 
-  // Mock transcription with timestamps
-  const transcriptionParagraphs = [
-    {
-      time: '00:00',
-      text: 'Bonjour et bienvenue dans ce cours sur les matrices. Aujourd\'hui, nous allons explorer les concepts fondamentaux qui constituent la base de l\'algèbre linéaire.',
-    },
-    {
-      time: '00:45',
-      text: 'Une matrice est essentiellement un tableau rectangulaire de nombres, arrangés en lignes et colonnes. Cette structure simple cache une puissance remarquable pour résoudre des problèmes complexes.',
-    },
-    {
-      time: '01:30',
-      text: 'Commençons par la notation. Une matrice est généralement notée par une lettre majuscule, comme A, B ou C. Les éléments individuels sont notés avec des indices.',
-    },
-    {
-      time: '02:15',
-      text: 'Par exemple, dans une matrice A, l\'élément situé à la ligne i et colonne j est noté a_ij. Cette notation nous permet de référencer précisément chaque élément.',
-    },
-    {
-      time: '03:00',
-      text: 'Les opérations de base sur les matrices incluent l\'addition et la soustraction. Pour additionner deux matrices, elles doivent avoir les mêmes dimensions.',
-    },
-    {
-      time: '03:45',
-      text: 'La multiplication matricielle est plus complexe. Le produit AB n\'est défini que si le nombre de colonnes de A égale le nombre de lignes de B.',
-    },
-  ];
+  if (!chapter || !chapter.transcription) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="document-text-outline" size={64} color={Colors.text.tertiary} />
+          <Text style={styles.errorTitle}>Transcription non disponible</Text>
+          <Text style={styles.errorSubtitle}>
+            La transcription de ce chapitre n'est pas encore prête ou n'existe pas
+          </Text>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>Retour</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -66,27 +81,21 @@ export const TranscriptionScreen: React.FC = () => {
         >
           <Ionicons name="close" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
-        
         <Text style={styles.title}>Transcription</Text>
-        
-        <TouchableOpacity style={styles.searchButton}>
-          <Ionicons name="search" size={24} color={Colors.text.primary} />
-        </TouchableOpacity>
+        <View style={styles.placeholder} />
       </View>
 
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.chapterName}>{chapter.name}</Text>
-        
-        {transcriptionParagraphs.map((paragraph, index) => (
-          <View key={index} style={styles.paragraph}>
-            <Text style={styles.timestamp}>{paragraph.time}</Text>
-            <Text style={styles.text}>{paragraph.text}</Text>
-          </View>
-        ))}
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.chapterInfo}>
+          <Text style={styles.chapterName}>{chapter.name}</Text>
+          {chapter.duration > 0 && (
+            <Text style={styles.chapterDuration}>{chapter.duration} minutes</Text>
+          )}
+        </View>
+
+        <View style={styles.transcriptionCard}>
+          <Text style={styles.transcriptionText}>{chapter.transcription}</Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -103,6 +112,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 24,
     paddingVertical: 16,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.gray[200],
   },
@@ -115,36 +125,68 @@ const styles = StyleSheet.create({
     ...Typography.headline,
     color: Colors.text.primary,
   },
-  searchButton: {
+  placeholder: {
     width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'flex-end',
   },
-  scrollView: {
+  content: {
     flex: 1,
+    padding: 24,
   },
-  scrollContent: {
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  errorTitle: {
+    ...Typography.title2,
+    color: Colors.text.primary,
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  errorSubtitle: {
+    ...Typography.body,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  backButton: {
+    backgroundColor: Colors.accent.blue,
     paddingHorizontal: 24,
-    paddingVertical: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  backButtonText: {
+    ...Typography.headline,
+    color: Colors.surface,
+    fontWeight: '600',
+  },
+  chapterInfo: {
+    marginBottom: 24,
   },
   chapterName: {
     ...Typography.title2,
     color: Colors.text.primary,
-    marginBottom: 24,
-  },
-  paragraph: {
-    marginBottom: 24,
-  },
-  timestamp: {
-    ...Typography.caption1,
-    color: Colors.accent.blue,
-    fontWeight: '600',
     marginBottom: 8,
   },
-  text: {
+  chapterDuration: {
+    ...Typography.subheadline,
+    color: Colors.text.secondary,
+  },
+  transcriptionCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 24,
+  },
+  transcriptionText: {
     ...Typography.body,
     color: Colors.text.primary,
-    lineHeight: 24,
+    lineHeight: 28,
   },
 });

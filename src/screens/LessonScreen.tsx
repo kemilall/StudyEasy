@@ -1,64 +1,72 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   SafeAreaView,
+  FlatList,
   TouchableOpacity,
-  Alert,
+  ActivityIndicator,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { ChapterCard } from '../components/ChapterCard';
-import { mockLessons, mockChapters } from '../data/mockData';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
-import { RootStackParamList } from '../navigation/types';
-import * as DocumentPicker from 'expo-document-picker';
-
-type LessonScreenRouteProp = RouteProp<RootStackParamList, 'Lesson'>;
-type LessonScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Lesson'>;
+import { useAuth } from '../contexts/AuthContext';
+import { DataService } from '../services/dataService';
+import { Lesson, Chapter } from '../types';
 
 export const LessonScreen: React.FC = () => {
-  const navigation = useNavigation<LessonScreenNavigationProp>();
-  const route = useRoute<LessonScreenRouteProp>();
-  const { lessonId } = route.params;
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { user } = useAuth();
+  const { lessonId } = route.params as { lessonId: string };
+  
+  const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const lesson = mockLessons.find(l => l.id === lessonId);
-  const chapters = mockChapters.filter(c => c.lessonId === lessonId);
+  useEffect(() => {
+    if (!user || !lessonId) return;
 
-  if (!lesson) {
-    return null;
-  }
-
-  const handleUploadAudio = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'audio/*',
-        copyToCacheDirectory: true,
-      });
-      
-      if (result.type === 'success') {
-        Alert.alert(
-          'Audio importé',
-          'Le fichier audio est en cours de traitement. Vous serez notifié une fois terminé.',
-          [{ text: 'OK' }]
-        );
+    // Get lesson data
+    const loadLesson = async () => {
+      try {
+        const lessonData = await DataService.getLesson(lessonId);
+        setLesson(lessonData);
+      } catch (error) {
+        console.error('Error loading lesson:', error);
       }
-    } catch (error) {
-      Alert.alert('Erreur', 'Impossible d\'importer le fichier audio.');
-    }
-  };
+    };
 
-  const renderChapter = ({ item }: { item: typeof chapters[0] }) => (
+    // Subscribe to chapters
+    const unsubscribe = DataService.subscribeToLessonChapters(lessonId, (lessonChapters) => {
+      setChapters(lessonChapters);
+      setIsLoading(false);
+    });
+
+    loadLesson();
+
+    return () => unsubscribe();
+  }, [user, lessonId]);
+
+  const renderChapter = ({ item }: { item: Chapter }) => (
     <ChapterCard
       chapter={item}
-      onPress={() => navigation.navigate('Chapter', { chapterId: item.id })}
-      onUpload={handleUploadAudio}
+      onPress={() => navigation.navigate('Chapter' as never, { chapterId: item.id })}
     />
   );
+
+  if (!lesson) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.accent.blue} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -69,23 +77,61 @@ export const LessonScreen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
-        
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>{lesson.name}</Text>
-          <Text style={styles.subtitle}>
-            {lesson.completedChapters}/{lesson.chaptersCount} chapitres complétés
+        <View style={styles.headerContent}>
+          <Text style={styles.lessonName}>{lesson.name}</Text>
+          <Text style={styles.lessonStats}>
+            {lesson.chaptersCount} chapitres • {lesson.completedChapters} terminés
           </Text>
+          {lesson.description && (
+            <Text style={styles.lessonDescription}>{lesson.description}</Text>
+          )}
         </View>
       </View>
 
-      <FlatList
-        data={chapters}
-        renderItem={renderChapter}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      <View style={styles.content}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Chapitres</Text>
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={() => navigation.navigate('AudioImport' as never, { 
+              lessonId,
+              chapterName: `Chapitre ${chapters.length + 1}`
+            })}
+          >
+            <Ionicons name="add" size={20} color={Colors.accent.blue} />
+            <Text style={styles.addButtonText}>Ajouter</Text>
+          </TouchableOpacity>
+        </View>
 
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.accent.blue} />
+          </View>
+        ) : chapters.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="document-outline" size={64} color={Colors.text.tertiary} />
+            <Text style={styles.emptyTitle}>Aucun chapitre</Text>
+            <Text style={styles.emptySubtitle}>Importez un audio ou un texte pour créer votre premier chapitre</Text>
+            <TouchableOpacity 
+              style={styles.createChapterButton}
+              onPress={() => navigation.navigate('AudioImport' as never, { 
+                lessonId,
+                chapterName: 'Chapitre 1'
+              })}
+            >
+              <Text style={styles.createChapterButtonText}>Importer un audio</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <FlatList
+            data={chapters}
+            renderItem={renderChapter}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.chaptersList}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </View>
     </SafeAreaView>
   );
 };
@@ -96,29 +142,107 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 60,
     paddingBottom: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
+    paddingHorizontal: 24,
+    backgroundColor: Colors.surface,
   },
   backButton: {
-    marginRight: 16,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    marginBottom: 16,
   },
-  titleContainer: {
-    flex: 1,
+  headerContent: {
+    alignItems: 'center',
   },
-  title: {
+  lessonName: {
     ...Typography.title1,
     color: Colors.text.primary,
-    marginBottom: 4,
+    marginBottom: 8,
+    textAlign: 'center',
   },
-  subtitle: {
+  lessonStats: {
     ...Typography.subheadline,
     color: Colors.text.secondary,
+    marginBottom: 12,
   },
-  listContent: {
+  lessonDescription: {
+    ...Typography.body,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  content: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    marginTop: -24,
+    paddingTop: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    ...Typography.title2,
+    color: Colors.text.primary,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.accent.blue + '15',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 4,
+  },
+  addButtonText: {
+    ...Typography.subheadline,
+    color: Colors.accent.blue,
+    fontWeight: '600',
+  },
+  chaptersList: {
     paddingHorizontal: 24,
     paddingBottom: 100,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    ...Typography.title2,
+    color: Colors.text.primary,
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    ...Typography.body,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  createChapterButton: {
+    backgroundColor: Colors.accent.blue,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  createChapterButtonText: {
+    ...Typography.headline,
+    color: Colors.surface,
+    fontWeight: '600',
   },
 });

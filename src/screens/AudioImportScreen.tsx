@@ -7,17 +7,32 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
+import { useAuth } from '../contexts/AuthContext';
+import { StorageService, UploadProgress } from '../services/storageService';
+import { FileUploadService } from '../services/fileUploadService';
+import { DataService } from '../services/dataService';
+
+interface RouteParams {
+  lessonId: string;
+  chapterName?: string;
+}
 
 export const AudioImportScreen: React.FC = () => {
   const navigation = useNavigation();
+  const route = useRoute();
+  const { user } = useAuth();
+  const { lessonId, chapterName } = route.params as RouteParams;
+  
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
 
   const handlePickAudio = async () => {
     try {
@@ -26,23 +41,87 @@ export const AudioImportScreen: React.FC = () => {
         copyToCacheDirectory: true,
       });
       
-      if (result.type === 'success') {
+      // Handle both old and new DocumentPicker API
+      if (result.type === 'success' || (result as any).assets) {
+        // New API returns { assets: [...] }
+        const file = (result as any).assets ? (result as any).assets[0] : result;
+        console.log('Picked file:', file);
+        setSelectedFile(file);
+      } else if (!result.canceled && !(result as any).cancelled) {
+        // Old API compatibility
+        console.log('Picked file (old API):', result);
         setSelectedFile(result);
       }
     } catch (error) {
+      console.error('Error picking audio:', error);
       Alert.alert('Erreur', 'Impossible de sélectionner le fichier audio.');
     }
   };
 
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || !user) return;
+    
+    console.log('Selected file:', selectedFile);
+    
+    // Validate file URI
+    if (!selectedFile.uri) {
+      Alert.alert('Erreur', 'Le fichier sélectionné n\'a pas d\'URI valide. Veuillez réessayer.');
+      return;
+    }
     
     setIsUploading(true);
-    // Simuler l'upload
-    setTimeout(() => {
+    
+    try {
+      // 1. Create chapter first
+      const chapterId = await DataService.createChapter(user.uid, {
+        lessonId,
+        name: chapterName || (selectedFile.name ? selectedFile.name.replace(/\.[^/.]+$/, "") : "Nouveau chapitre"),
+        isProcessing: true,
+        isCompleted: false,
+        duration: 0,
+      });
+
+      // 2. Upload audio file using the new FileUploadService
+      const storagePath = `audio/${user.uid}/${chapterId}/${Date.now()}.m4a`;
+      
+      let audioUrl: string;
+      try {
+        // Try XMLHttpRequest method first (more reliable)
+        audioUrl = await FileUploadService.uploadFileWithXHR(
+          selectedFile.uri,
+          storagePath,
+          (progress) => setUploadProgress(progress)
+        );
+      } catch (error) {
+        console.log('XMLHttpRequest upload failed, trying base64 method:', error);
+        // Fallback to base64 method for smaller files
+        audioUrl = await FileUploadService.uploadFileAsBase64(
+          selectedFile.uri,
+          storagePath,
+          (progress) => setUploadProgress(progress)
+        );
+      }
+
+      // 3. Update chapter with audio URL
+      await DataService.updateChapter(chapterId, { audioUrl });
+
+      // 4. Navigate to processing screen for AI processing (include local file metadata)
+      navigation.navigate('ProcessingScreen' as never, {
+        chapterId,
+        audioUrl,
+        lessonId,
+        localUri: selectedFile.uri,
+        fileName: selectedFile.name,
+        mimeType: selectedFile.mimeType,
+      } as never);
+
+    } catch (error) {
+      console.error('Error uploading and processing audio:', error);
+      Alert.alert('Erreur', 'Impossible de traiter le fichier audio. Veuillez réessayer.');
+    } finally {
       setIsUploading(false);
-      navigation.navigate('ProcessingScreen' as never);
-    }, 2000);
+      setUploadProgress(null);
+    }
   };
 
   const formatFileSize = (bytes: number) => {
@@ -102,8 +181,8 @@ export const AudioImportScreen: React.FC = () => {
                 <Ionicons name="musical-notes" size={24} color={Colors.accent.green} />
               </View>
               <View style={styles.fileInfo}>
-                <Text style={styles.fileName}>{selectedFile.name}</Text>
-                <Text style={styles.fileSize}>{formatFileSize(selectedFile.size)}</Text>
+                <Text style={styles.fileName}>{selectedFile.name || 'Fichier audio'}</Text>
+                <Text style={styles.fileSize}>{formatFileSize(selectedFile.size || 0)}</Text>
               </View>
               <TouchableOpacity 
                 onPress={() => setSelectedFile(null)}
@@ -147,8 +226,10 @@ export const AudioImportScreen: React.FC = () => {
           >
             {isUploading ? (
               <>
-                <Ionicons name="hourglass-outline" size={20} color={Colors.surface} />
-                <Text style={styles.uploadButtonText}>Traitement en cours...</Text>
+                <ActivityIndicator size="small" color={Colors.surface} />
+                <Text style={styles.uploadButtonText}>
+                  {uploadProgress ? `${Math.round(uploadProgress.progress)}%` : 'Traitement en cours...'}
+                </Text>
               </>
             ) : (
               <>

@@ -5,11 +5,19 @@ export type RootStackParamList = {
   Flashcards: { chapterId: string };
   Quiz: { chapterId: string };
   Chat: { chapterId: string };
-  AudioImportScreen: undefined;
-  CreateSubjectScreen: undefined;
-  CreateLessonScreen: { subjectId?: string };
-  CreateChapterScreen: { lessonId?: string };
-  ProcessingScreen: undefined;
+  AudioImportScreen: { lessonId: string; chapterName?: string } | undefined;
+  CreateSubject: undefined;
+  CreateLesson: { subjectId?: string };
+  CreateChapter: { lessonId?: string };
+  ProcessingScreen: {
+    chapterId: string;
+    lessonId: string;
+    audioUrl?: string; // remote URL (Firebase) optional
+    documentText?: string;
+    localUri?: string; // local file URI to send to backend
+    fileName?: string;
+    mimeType?: string;
+  } | undefined;
 };
 
 export type MainTabParamList = {

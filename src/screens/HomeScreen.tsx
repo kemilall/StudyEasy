@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,183 +7,441 @@ import {
   SafeAreaView,
   TouchableOpacity,
   FlatList,
+  ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { RecentChapterCard } from '../components/RecentChapterCard';
-import { QuickQuizCard } from '../components/QuickQuizCard';
-import { StreakCard } from '../components/StreakCard';
-import { mockSubjects } from '../data/mockData';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
-type HomeScreenNavigationProp = StackNavigationProp<any, any>;
+import { Subject, Chapter } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import { DataService } from '../services/dataService';
+import { CourseCard } from '../components/CourseCard';
+
+const { width } = Dimensions.get('window');
 
 export const HomeScreen: React.FC = () => {
-  const navigation = useNavigation<HomeScreenNavigationProp>();
+  const navigation = useNavigation<any>();
+  const { user, userProfile } = useAuth();
 
-  // Mock data pour les chapitres récents
-  const recentChapters = [
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [recentChapters, setRecentChapters] = useState<Chapter[]>([]);
+  const [isLoadingSubjects, setIsLoadingSubjects] = useState<boolean>(false);
+  const [isLoadingChapters, setIsLoadingChapters] = useState<boolean>(false);
+
+  // Mock data for development/testing - useMemo to prevent re-creation
+  const mockSubjects = React.useMemo(() => [
     {
       id: '1',
-      chapterName: 'Introduction aux Matrices',
-      lessonName: 'Algèbre Linéaire',
-      subjectName: 'Mathématiques',
-      progress: 75,
+      name: 'Mathématiques',
+      color: Colors.accent.blue,
+      lessonsCount: 12,
+      completedLessons: 8,
+      userId: user?.uid || '',
+      createdAt: new Date(),
+      updatedAt: new Date(),
     },
     {
       id: '2',
-      chapterName: 'Les Forces',
-      lessonName: 'Mécanique',
-      subjectName: 'Physique',
-      progress: 40,
+      name: 'Physique',
+      color: Colors.accent.green,
+      lessonsCount: 9,
+      completedLessons: 3,
+      userId: user?.uid || '',
+      createdAt: new Date(),
+      updatedAt: new Date(),
     },
     {
       id: '3',
-      chapterName: 'Structure Atomique',
-      lessonName: 'Chimie Générale',
-      subjectName: 'Chimie',
-      progress: 90,
+      name: 'Histoire',
+      color: Colors.accent.orange,
+      lessonsCount: 15,
+      completedLessons: 10,
+      userId: user?.uid || '',
+      createdAt: new Date(),
+      updatedAt: new Date(),
     },
-  ];
+    {
+      id: '4',
+      name: 'Chimie',
+      color: Colors.accent.purple,
+      lessonsCount: 7,
+      completedLessons: 2,
+      userId: user?.uid || '',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  ], [user?.uid]);
 
-  // Mock data pour les quiz récents
-  const recentQuizzes = [
+  const mockChapters = React.useMemo(() => [
     {
       id: '1',
-      subject: 'Mathématiques - Matrices',
-      questionsCount: 10,
-      difficulty: 'Moyen' as const,
-      estimatedTime: 15,
-    },
+      name: 'Les équations du second degré',
+      content: '',
+      summary: '',
+      progress: 75,
+      isCompleted: false,
+      duration: 45,
+      lessonId: '1',
+      userId: user?.uid || '',
+      createdAt: new Date(Date.now() - 86400000), // Yesterday
+      updatedAt: new Date(Date.now() - 86400000),
+      subjectName: 'Mathématiques',
+      subjectColor: Colors.accent.blue,
+      lessonName: 'Algèbre avancée',
+      subjectId: '1',
+    } as any,
     {
       id: '2',
-      subject: 'Physique - Forces',
-      questionsCount: 8,
-      difficulty: 'Facile' as const,
-      estimatedTime: 10,
-    },
-  ];
+      name: 'La révolution française',
+      content: '',
+      summary: '',
+      progress: 100,
+      isCompleted: true,
+      duration: 60,
+      lessonId: '2',
+      userId: user?.uid || '',
+      createdAt: new Date(Date.now() - 172800000), // 2 days ago
+      updatedAt: new Date(Date.now() - 172800000),
+      subjectName: 'Histoire',
+      subjectColor: Colors.accent.orange,
+      lessonName: 'Histoire moderne',
+      subjectId: '3',
+    } as any,
+    {
+      id: '3',
+      name: 'Forces et mouvements',
+      content: '',
+      summary: '',
+      progress: 30,
+      isCompleted: false,
+      duration: 50,
+      lessonId: '3',
+      userId: user?.uid || '',
+      createdAt: new Date(Date.now() - 259200000), // 3 days ago
+      updatedAt: new Date(Date.now() - 259200000),
+      subjectName: 'Physique',
+      subjectColor: Colors.accent.green,
+      lessonName: 'Mécanique',
+      subjectId: '2',
+    } as any,
+    {
+      id: '4',
+      name: 'Liaisons chimiques',
+      content: '',
+      summary: '',
+      progress: 60,
+      isCompleted: false,
+      duration: 40,
+      lessonId: '4',
+      userId: user?.uid || '',
+      createdAt: new Date(Date.now() - 345600000), // 4 days ago
+      updatedAt: new Date(Date.now() - 345600000),
+      subjectName: 'Chimie',
+      subjectColor: Colors.accent.purple,
+      lessonName: 'Chimie générale',
+      subjectId: '4',
+    } as any,
+    {
+      id: '5',
+      name: 'Dérivées et primitives',
+      content: '',
+      summary: '',
+      progress: 90,
+      isCompleted: false,
+      duration: 55,
+      lessonId: '5',
+      userId: user?.uid || '',
+      createdAt: new Date(Date.now() - 432000000), // 5 days ago
+      updatedAt: new Date(Date.now() - 432000000),
+      subjectName: 'Mathématiques',
+      subjectColor: Colors.accent.blue,
+      lessonName: 'Analyse',
+      subjectId: '1',
+    } as any,
+    {
+      id: '6',
+      name: 'Les guerres mondiales',
+      content: '',
+      summary: '',
+      progress: 45,
+      isCompleted: false,
+      duration: 65,
+      lessonId: '6',
+      userId: user?.uid || '',
+      createdAt: new Date(Date.now() - 518400000), // 6 days ago
+      updatedAt: new Date(Date.now() - 518400000),
+      subjectName: 'Histoire',
+      subjectColor: Colors.accent.orange,
+      lessonName: 'Histoire contemporaine',
+      subjectId: '3',
+    } as any,
+  ], [user?.uid]);
 
-  // Les 3 matières les plus utilisées
-  const topSubjects = mockSubjects.slice(0, 3);
+  useEffect(() => {
+    if (!user) return;
 
-  const renderRecentChapter = ({ item }: { item: typeof recentChapters[0] }) => (
-    <RecentChapterCard
-      chapterName={item.chapterName}
-      lessonName={item.lessonName}
-      subjectName={item.subjectName}
-      progress={item.progress}
-      onPress={() => navigation.navigate('Chapter', { chapterId: item.id })}
-    />
-  );
+    setIsLoadingSubjects(true);
+    setIsLoadingChapters(true);
+    
+    // Subscribe to real-time updates for user subjects
+    const unsubscribeSubjects = DataService.subscribeToUserSubjects(user.uid, (updatedSubjects) => {
+      setSubjects(updatedSubjects);
+      setIsLoadingSubjects(false);
+    });
 
-  const getCurrentGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Bonjour';
-    if (hour < 18) return 'Bon après-midi';
-    return 'Bonsoir';
+    // Subscribe to real-time updates for recent chapters
+    const unsubscribeChapters = DataService.subscribeToRecentChapters(user.uid, (updatedChapters) => {
+      setRecentChapters(updatedChapters);
+      setIsLoadingChapters(false);
+    }, 8); // Limit to 8 recent chapters
+
+    return () => {
+      unsubscribeSubjects();
+      unsubscribeChapters();
+    };
+  }, [user?.uid]); // Only depend on user ID, not the mock data objects
+
+  // Use mock data if no real data is available
+  const displaySubjects = subjects.length > 0 ? subjects : mockSubjects;
+  const displayChapters = recentChapters.length > 0 ? recentChapters : mockChapters;
+
+  const renderSubjectItem = ({ item }: { item: Subject }) => {
+    // Choose different icons for different subjects
+    const getSubjectIcon = (name: string) => {
+      const lowercaseName = name.toLowerCase();
+      if (lowercaseName.includes('math')) return 'calculator-outline';
+      if (lowercaseName.includes('physi')) return 'planet-outline';
+      if (lowercaseName.includes('chimi')) return 'flask-outline';
+      if (lowercaseName.includes('histoi')) return 'library-outline';
+      if (lowercaseName.includes('géo')) return 'earth-outline';
+      if (lowercaseName.includes('bio')) return 'leaf-outline';
+      if (lowercaseName.includes('info')) return 'code-slash-outline';
+      if (lowercaseName.includes('anglais') || lowercaseName.includes('english')) return 'language-outline';
+      return 'book-outline';
+    };
+
+    return (
+      <TouchableOpacity
+        style={styles.subjectCard}
+        activeOpacity={0.7}
+        onPress={() => navigation.navigate('Subjects', { screen: 'Subject', params: { subjectId: item.id } })}
+      >
+        <View style={styles.subjectCardContent}>
+          <Ionicons 
+            name={getSubjectIcon(item.name) as any} 
+            size={24} 
+            color={item.color} 
+            style={styles.subjectMainIcon}
+          />
+          <Text style={styles.subjectName} numberOfLines={2}>{item.name}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderRecentCourse = (item: Chapter, index: number) => {
+    // Use the enriched data from the service
+    const color = item.subjectColor || Colors.accent.blue;
+    
+    // Format date
+    const formatDate = (date: Date) => {
+      const now = new Date();
+      const diffTime = now.getTime() - date.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 0) return "Aujourd'hui";
+      if (diffDays === 1) return "Hier";
+      if (diffDays < 7) return `Il y a ${diffDays} jours`;
+      return `Il y a ${Math.ceil(diffDays / 7)} semaines`;
+    };
+
+    // Format duration
+    const formatDuration = (minutes: number) => {
+      if (minutes < 60) return `${minutes} min`;
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
+    };
+    
+    return (
+      <TouchableOpacity
+        key={item.id}
+        style={styles.courseRowCard}
+        activeOpacity={0.7}
+        onPress={() => navigation.navigate('Chapter', { chapterId: item.id })}
+      >
+        <View style={styles.courseRowContent}>
+          <View style={styles.courseRowHeader}>
+            <View style={[styles.courseBadge, { backgroundColor: color + '15' }]}>
+              <Text style={[styles.courseBadgeText, { color }]}>
+                {item.subjectName || 'Matière'}
+              </Text>
+            </View>
+            <View style={styles.courseRowMeta}>
+              <View style={styles.courseMetaItem}>
+                <Ionicons name="time-outline" size={14} color={Colors.text.tertiary} />
+                <Text style={styles.courseMetaText}>
+                  {formatDuration(item.duration || 45)}
+                </Text>
+              </View>
+              <View style={styles.courseMetaItem}>
+                <Ionicons name="calendar-outline" size={14} color={Colors.text.tertiary} />
+                <Text style={styles.courseMetaText}>
+                  {formatDate(item.updatedAt)}
+                </Text>
+              </View>
+            </View>
+          </View>
+          
+          <Text style={styles.courseRowTitle} numberOfLines={2}>
+            {item.name}
+          </Text>
+          
+          <View style={styles.courseRowFooter}>
+            <Text style={styles.courseRowProgress}>
+              {item.progress || 0}% terminé
+            </Text>
+            <View style={styles.courseRowProgressBar}>
+              <View 
+                style={[
+                  styles.courseRowProgressFill, 
+                  { 
+                    width: `${item.progress || 0}%`,
+                    backgroundColor: color 
+                  }
+                ]} 
+              />
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header avec salutation personnalisée */}
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>{getCurrentGreeting()}</Text>
-            <Text style={styles.userName}>Alex</Text>
+            <Text style={styles.welcomeText}>Bienvenue,</Text>
+            <Text style={styles.userName}>{userProfile?.displayName || 'Étudiant'}</Text>
           </View>
-          <TouchableOpacity style={styles.notificationButton}>
-            <View style={styles.notificationDot} />
-            <Ionicons name="notifications-outline" size={24} color={Colors.text.primary} />
+          <TouchableOpacity style={styles.profileButton}>
+            <Ionicons name="person-circle" size={32} color={Colors.text.primary} />
           </TouchableOpacity>
         </View>
 
-        {/* Streak Card */}
-        <StreakCard currentStreak={7} bestStreak={15} />
+        {/* Action Buttons */}
+        <View style={styles.actionButtons}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('AudioImport')}
+          >
+            <View style={styles.actionIconContainer}>
+              <Ionicons name="mic" size={24} color={Colors.accent.red} />
+            </View>
+            <Text style={styles.actionButtonText}>Enregistrer</Text>
+            <Text style={styles.actionButtonSubtext}>un cours</Text>
+          </TouchableOpacity>
 
-        {/* Bouton créer un chapitre */}
-        <TouchableOpacity 
-          style={styles.createChapterButton} 
-          activeOpacity={0.8}
-          onPress={() => navigation.navigate('CreateChapterScreen' as never)}
-        >
-          <View style={styles.createChapterIcon}>
-            <Ionicons name="add" size={24} color={Colors.accent.blue} />
-          </View>
-          <View style={styles.createChapterContent}>
-            <Text style={styles.createChapterTitle}>Créer un nouveau chapitre</Text>
-            <Text style={styles.createChapterSubtitle}>Importez un audio pour commencer</Text>
-          </View>
-          <Ionicons name="arrow-forward" size={20} color={Colors.text.tertiary} />
-        </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('AudioImport')}
+          >
+            <View style={styles.actionIconContainer}>
+              <Ionicons name="volume-high" size={24} color={Colors.accent.blue} />
+            </View>
+            <Text style={styles.actionButtonText}>Importer</Text>
+            <Text style={styles.actionButtonSubtext}>un audio</Text>
+          </TouchableOpacity>
 
-        {/* Chapitres récents */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Continuer l'apprentissage</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAll}>Voir tout</Text>
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={recentChapters}
-            renderItem={renderRecentChapter}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalList}
-          />
+          <TouchableOpacity 
+            style={styles.actionButton}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('CreateLesson')}
+          >
+            <View style={styles.actionIconContainer}>
+              <Ionicons name="document-text" size={24} color={Colors.accent.green} />
+            </View>
+            <Text style={styles.actionButtonText}>Importer</Text>
+            <Text style={styles.actionButtonSubtext}>un cours</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Matières populaires */}
+        {/* Subjects Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Vos matières</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAll}>Tout voir</Text>
+            <Text style={styles.sectionTitle}>Matières</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Subjects', { screen: 'SubjectsList' })}>
+              <Text style={styles.seeAllButton}>Voir tout</Text>
             </TouchableOpacity>
           </View>
-          <View style={styles.subjectsGrid}>
-            {topSubjects.map((subject) => (
-              <TouchableOpacity
-                key={subject.id}
-                style={[styles.subjectCard, { backgroundColor: subject.color + '15' }]}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.subjectIcon, { backgroundColor: subject.color + '25' }]}>
-                  <Ionicons name="book" size={20} color={subject.color} />
-                </View>
-                <Text style={styles.subjectName}>{subject.name}</Text>
-                <Text style={styles.subjectLessons}>
-                  {subject.lessonsCount} leçons
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Quiz rapides */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Quiz rapides</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAll}>Voir tout</Text>
+          
+          {isLoadingSubjects ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={Colors.accent.blue} />
+            </View>
+          ) : displaySubjects.length === 0 ? (
+            <TouchableOpacity 
+              style={styles.emptySubjects}
+              onPress={() => navigation.navigate('CreateSubject')}
+            >
+              <Ionicons name="add-circle-outline" size={48} color={Colors.text.tertiary} />
+              <Text style={styles.emptyText}>Créer une matière</Text>
             </TouchableOpacity>
-          </View>
-          {recentQuizzes.map((quiz) => (
-            <QuickQuizCard
-              key={quiz.id}
-              subject={quiz.subject}
-              questionsCount={quiz.questionsCount}
-              difficulty={quiz.difficulty}
-              estimatedTime={quiz.estimatedTime}
-              onPress={() => navigation.navigate('Quiz', { chapterId: '1' })}
+          ) : (
+            <FlatList
+              data={displaySubjects}
+              renderItem={renderSubjectItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.subjectsList}
             />
-          ))}
+          )}
         </View>
 
+        {/* Recent Courses Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Cours récents</Text>
+            {displayChapters.length > 0 && (
+              <TouchableOpacity>
+                <Text style={styles.seeAllButton}>Voir tout</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {isLoadingChapters ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={Colors.accent.blue} />
+            </View>
+          ) : displayChapters.length === 0 ? (
+            <View style={styles.emptyCoursesContainer}>
+              <View style={styles.emptyCourseCard}>
+                <Ionicons name="book-outline" size={48} color={Colors.text.tertiary} />
+                <Text style={styles.emptyCoursesText}>Aucun cours récent</Text>
+                <Text style={styles.emptyCoursesSubtext}>
+                  Commencez par enregistrer ou importer un cours
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.coursesColumn}>
+              {displayChapters.slice(0, 5).map((chapter, index) => 
+                renderRecentCourse(chapter, index)
+              )}
+            </View>
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -194,124 +452,266 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  scrollContent: {
+    paddingBottom: 24,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 24,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 28,
   },
-  greeting: {
-    ...Typography.body,
-    color: Colors.text.secondary,
-  },
-  userName: {
-    ...Typography.title1,
-    color: Colors.text.primary,
-    marginTop: 4,
-  },
-  notificationButton: {
-    position: 'relative',
-  },
-  notificationDot: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.accent.red,
-    zIndex: 1,
-  },
-  createChapterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    marginHorizontal: 24,
-    marginBottom: 32,
-    padding: 20,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  createChapterIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.accent.blue + '15',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  createChapterContent: {
-    flex: 1,
-  },
-  createChapterTitle: {
-    ...Typography.headline,
-    color: Colors.text.primary,
-    marginBottom: 4,
-  },
-  createChapterSubtitle: {
+  welcomeText: {
     ...Typography.subheadline,
     color: Colors.text.secondary,
+    letterSpacing: 0.2,
+  },
+  userName: {
+    ...Typography.largeTitle,
+    color: Colors.text.primary,
+    marginTop: 4,
+    fontWeight: '800',
+  },
+  profileButton: {
+    padding: 4,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    gap: 12,
+    marginBottom: 36,
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    shadowColor: Colors.card.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 1,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+  actionIconContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: Colors.gray[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  actionButtonText: {
+    ...Typography.footnote,
+    color: Colors.text.primary,
+    fontWeight: '700',
+    letterSpacing: 0.1,
+  },
+  actionButtonSubtext: {
+    ...Typography.caption1,
+    color: Colors.text.secondary,
+    marginTop: 2,
   },
   section: {
-    marginBottom: 32,
+    marginBottom: 36,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    marginBottom: 16,
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   sectionTitle: {
     ...Typography.title2,
     color: Colors.text.primary,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
-  seeAll: {
-    ...Typography.subheadline,
+  seeAllButton: {
+    ...Typography.footnote,
     color: Colors.accent.blue,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
-  horizontalList: {
-    paddingHorizontal: 24,
-  },
-  subjectsGrid: {
-    flexDirection: 'row',
-    paddingHorizontal: 24,
-    gap: 12,
+  subjectsList: {
+    paddingLeft: 20,
   },
   subjectCard: {
-    flex: 1,
-    padding: 16,
+    width: 180,
+    height: 70,
+    backgroundColor: Colors.surface,
     borderRadius: 16,
-    alignItems: 'center',
+    marginRight: 16,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    shadowColor: Colors.card.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  subjectIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
+  subjectCardContent: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  subjectMainIcon: {
+    flexShrink: 0,
   },
   subjectName: {
     ...Typography.subheadline,
     color: Colors.text.primary,
-    fontWeight: '600',
-    marginBottom: 4,
-    textAlign: 'center',
+    fontWeight: '700',
+    flex: 1,
+    lineHeight: 20,
   },
-  subjectLessons: {
+  loadingContainer: {
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptySubjects: {
+    height: 100,
+    marginHorizontal: 20,
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: Colors.gray[200],
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    ...Typography.footnote,
+    color: Colors.text.tertiary,
+    marginTop: 8,
+    fontWeight: '600',
+  },
+  coursesColumn: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  courseRowCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    shadowColor: Colors.card.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  courseRowContent: {
+    padding: 16,
+  },
+  courseRowHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  courseBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  courseBadgeText: {
+    ...Typography.caption1,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  courseRowMeta: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  courseMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  courseMetaText: {
+    ...Typography.caption2,
+    color: Colors.text.tertiary,
+  },
+  courseRowTitle: {
+    ...Typography.headline,
+    color: Colors.text.primary,
+    fontWeight: '700',
+    lineHeight: 24,
+    marginBottom: 12,
+  },
+  courseRowFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  courseRowProgress: {
     ...Typography.caption1,
     color: Colors.text.secondary,
+    fontWeight: '600',
+    marginRight: 12,
+  },
+  courseRowProgressBar: {
+    flex: 1,
+    height: 6,
+    backgroundColor: Colors.gray[200],
+    borderRadius: 3,
+  },
+  courseRowProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  emptyCoursesContainer: {
+    paddingHorizontal: 20,
+  },
+  emptyCourseCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 24,
+    padding: 48,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    shadowColor: Colors.card.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 1,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+  emptyCoursesText: {
+    ...Typography.title3,
+    color: Colors.text.primary,
+    marginTop: 16,
+    fontWeight: '700',
+  },
+  emptyCoursesSubtext: {
+    ...Typography.body,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 24,
   },
 });

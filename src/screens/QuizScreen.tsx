@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,81 +6,163 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
-  Alert,
+  ActivityIndicator,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { mockQuizQuestions } from '../data/mockData';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
-import { RootStackParamList } from '../navigation/types';
-
-type QuizScreenRouteProp = RouteProp<RootStackParamList, 'Quiz'>;
-type QuizScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Quiz'>;
+import { useAuth } from '../contexts/AuthContext';
+import { DataService } from '../services/dataService';
+import { Chapter, QuizQuestion } from '../types';
 
 export const QuizScreen: React.FC = () => {
-  const navigation = useNavigation<QuizScreenNavigationProp>();
-  const route = useRoute<QuizScreenRouteProp>();
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [showExplanation, setShowExplanation] = useState(false);
-  const [score, setScore] = useState(0);
-  const [answers, setAnswers] = useState<(number | null)[]>(
-    new Array(mockQuizQuestions.length).fill(null)
-  );
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { user } = useAuth();
+  const { chapterId } = route.params as { chapterId: string };
+  
+  const [chapter, setChapter] = useState<Chapter | null>(null);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [selectedAnswers, setSelectedAnswers] = useState<number[]>([]);
+  const [showResult, setShowResult] = useState(false);
+  const [quizCompleted, setQuizCompleted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const questions = mockQuizQuestions;
-  const currentQuestion = questions[currentIndex];
-  const isLastQuestion = currentIndex === questions.length - 1;
+  useEffect(() => {
+    if (!user || !chapterId) return;
 
-  const handleSelectAnswer = (index: number) => {
-    if (!showExplanation) {
-      setSelectedAnswer(index);
-    }
+    const loadChapter = async () => {
+      try {
+        const chapterData = await DataService.getChapter(chapterId);
+        setChapter(chapterData);
+        if (chapterData?.quiz) {
+          setQuestions(chapterData.quiz);
+          setSelectedAnswers(new Array(chapterData.quiz.length).fill(-1));
+        }
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error loading chapter:', error);
+        setIsLoading(false);
+      }
+    };
+
+    loadChapter();
+  }, [user, chapterId]);
+
+  const selectAnswer = (answerIndex: number) => {
+    if (showResult) return;
+    
+    const newAnswers = [...selectedAnswers];
+    newAnswers[currentQuestionIndex] = answerIndex;
+    setSelectedAnswers(newAnswers);
   };
 
-  const handleValidate = () => {
-    if (selectedAnswer === null) {
-      Alert.alert('Sélectionnez une réponse', 'Veuillez choisir une réponse avant de valider.');
-      return;
-    }
-
-    const newAnswers = [...answers];
-    newAnswers[currentIndex] = selectedAnswer;
-    setAnswers(newAnswers);
-
-    if (selectedAnswer === currentQuestion.correctAnswer) {
-      setScore(score + 1);
-    }
-
-    setShowExplanation(true);
+  const showAnswer = () => {
+    setShowResult(true);
   };
 
-  const handleNext = () => {
-    if (isLastQuestion) {
-      Alert.alert(
-        'Quiz terminé!',
-        `Votre score: ${score}/${questions.length}`,
-        [
-          { text: 'Recommencer', onPress: handleRestart },
-          { text: 'Terminer', onPress: () => navigation.goBack() }
-        ]
-      );
+  const nextQuestion = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setShowResult(false);
     } else {
-      setCurrentIndex(currentIndex + 1);
-      setSelectedAnswer(null);
-      setShowExplanation(false);
+      setQuizCompleted(true);
     }
   };
 
-  const handleRestart = () => {
-    setCurrentIndex(0);
-    setSelectedAnswer(null);
-    setShowExplanation(false);
-    setScore(0);
-    setAnswers(new Array(questions.length).fill(null));
+  const previousQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+      setShowResult(false);
+    }
   };
+
+  const getScore = () => {
+    let correct = 0;
+    questions.forEach((question, index) => {
+      if (selectedAnswers[index] === question.correctAnswer) {
+        correct++;
+      }
+    });
+    return correct;
+  };
+
+  const restartQuiz = () => {
+    setCurrentQuestionIndex(0);
+    setSelectedAnswers(new Array(questions.length).fill(-1));
+    setShowResult(false);
+    setQuizCompleted(false);
+  };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.accent.blue} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!chapter || !questions.length) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="help-circle-outline" size={64} color={Colors.text.tertiary} />
+          <Text style={styles.errorTitle}>Aucun quiz</Text>
+          <Text style={styles.errorSubtitle}>
+            Le quiz de ce chapitre n'est pas encore prêt
+          </Text>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>Retour</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (quizCompleted) {
+    const score = getScore();
+    const percentage = Math.round((score / questions.length) * 100);
+    
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.resultContainer}>
+          <View style={styles.scoreCard}>
+            <Ionicons 
+              name={percentage >= 70 ? "checkmark-circle" : "close-circle"} 
+              size={64} 
+              color={percentage >= 70 ? Colors.accent.green : Colors.accent.red} 
+            />
+            <Text style={styles.scoreTitle}>Quiz terminé !</Text>
+            <Text style={styles.scoreText}>
+              {score} / {questions.length}
+            </Text>
+            <Text style={styles.percentageText}>{percentage}%</Text>
+            
+            <View style={styles.resultActions}>
+              <TouchableOpacity style={styles.restartButton} onPress={restartQuiz}>
+                <Ionicons name="refresh" size={20} color={Colors.surface} />
+                <Text style={styles.restartButtonText}>Recommencer</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.finishButton} onPress={() => navigation.goBack()}>
+                <Text style={styles.finishButtonText}>Terminer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const currentQuestion = questions[currentQuestionIndex];
+  const selectedAnswer = selectedAnswers[currentQuestionIndex];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -91,105 +173,101 @@ export const QuizScreen: React.FC = () => {
         >
           <Ionicons name="close" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
-        
         <Text style={styles.title}>Quiz</Text>
-        
-        <Text style={styles.score}>Score: {score}</Text>
+        <View style={styles.placeholder} />
       </View>
 
       <View style={styles.progressContainer}>
         <Text style={styles.progressText}>
-          Question {currentIndex + 1} / {questions.length}
+          Question {currentQuestionIndex + 1} sur {questions.length}
         </Text>
         <View style={styles.progressBar}>
           <View 
             style={[
               styles.progressFill, 
-              { width: `${((currentIndex + 1) / questions.length) * 100}%` }
+              { width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }
             ]} 
           />
         </View>
       </View>
 
-      <ScrollView 
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.question}>{currentQuestion.question}</Text>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.questionCard}>
+          <Text style={styles.questionText}>{currentQuestion.question}</Text>
+        </View>
 
-        <View style={styles.optionsContainer}>
+        <View style={styles.answersContainer}>
           {currentQuestion.options.map((option, index) => {
-            const isSelected = selectedAnswer === index;
-            const isCorrect = index === currentQuestion.correctAnswer;
-            const showResult = showExplanation;
+            let buttonStyle = styles.answerButton;
+            let textStyle = styles.answerText;
+            
+            if (showResult) {
+              if (index === currentQuestion.correctAnswer) {
+                buttonStyle = [styles.answerButton, styles.correctAnswer];
+                textStyle = [styles.answerText, styles.correctAnswerText];
+              } else if (index === selectedAnswer) {
+                buttonStyle = [styles.answerButton, styles.wrongAnswer];
+                textStyle = [styles.answerText, styles.wrongAnswerText];
+              }
+            } else if (index === selectedAnswer) {
+              buttonStyle = [styles.answerButton, styles.selectedAnswer];
+              textStyle = [styles.answerText, styles.selectedAnswerText];
+            }
 
             return (
               <TouchableOpacity
                 key={index}
-                style={[
-                  styles.option,
-                  isSelected && styles.optionSelected,
-                  showResult && isCorrect && styles.optionCorrect,
-                  showResult && isSelected && !isCorrect && styles.optionIncorrect,
-                ]}
-                onPress={() => handleSelectAnswer(index)}
-                disabled={showExplanation}
+                style={buttonStyle}
+                onPress={() => selectAnswer(index)}
+                disabled={showResult}
               >
-                <Text style={[
-                  styles.optionText,
-                  isSelected && styles.optionTextSelected,
-                  showResult && isCorrect && styles.optionTextCorrect,
-                  showResult && isSelected && !isCorrect && styles.optionTextIncorrect,
-                ]}>
-                  {option}
-                </Text>
-                {showResult && isCorrect && (
-                  <Ionicons name="checkmark-circle" size={20} color={Colors.accent.green} />
+                <View style={styles.answerOption}>
+                  <Text style={styles.answerLetter}>
+                    {String.fromCharCode(65 + index)}
+                  </Text>
+                </View>
+                <Text style={textStyle}>{option}</Text>
+                {showResult && index === currentQuestion.correctAnswer && (
+                  <Ionicons name="checkmark" size={20} color={Colors.accent.green} />
                 )}
-                {showResult && isSelected && !isCorrect && (
-                  <Ionicons name="close-circle" size={20} color={Colors.accent.red} />
+                {showResult && index === selectedAnswer && index !== currentQuestion.correctAnswer && (
+                  <Ionicons name="close" size={20} color={Colors.accent.red} />
                 )}
               </TouchableOpacity>
             );
           })}
         </View>
 
-        {showExplanation && (
-          <View style={styles.explanationContainer}>
+        {showResult && (
+          <View style={styles.explanationCard}>
             <Text style={styles.explanationTitle}>Explication</Text>
             <Text style={styles.explanationText}>{currentQuestion.explanation}</Text>
           </View>
         )}
       </ScrollView>
 
-      <View style={styles.footer}>
-        {!showExplanation ? (
-          <TouchableOpacity
-            style={[
-              styles.validateButton,
-              selectedAnswer === null && styles.validateButtonDisabled
-            ]}
-            onPress={handleValidate}
-            disabled={selectedAnswer === null}
-          >
-            <Text style={[
-              styles.validateButtonText,
-              selectedAnswer === null && styles.validateButtonTextDisabled
-            ]}>
-              Valider
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={styles.nextButton}
-            onPress={handleNext}
-          >
-            <Text style={styles.nextButtonText}>
-              {isLastQuestion ? 'Terminer' : 'Question suivante'}
-            </Text>
+      <View style={styles.controls}>
+        {currentQuestionIndex > 0 && (
+          <TouchableOpacity style={styles.secondaryButton} onPress={previousQuestion}>
+            <Text style={styles.secondaryButtonText}>Précédent</Text>
           </TouchableOpacity>
         )}
+        
+        <View style={styles.controlsRight}>
+          {!showResult && selectedAnswer !== -1 && (
+            <TouchableOpacity style={styles.primaryButton} onPress={showAnswer}>
+              <Text style={styles.primaryButtonText}>Valider</Text>
+            </TouchableOpacity>
+          )}
+          
+          {showResult && (
+            <TouchableOpacity style={styles.primaryButton} onPress={nextQuestion}>
+              <Text style={styles.primaryButtonText}>
+                {currentQuestionIndex === questions.length - 1 ? 'Terminer' : 'Suivant'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -206,6 +284,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 24,
     paddingVertical: 16,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.gray[200],
   },
@@ -218,26 +297,58 @@ const styles = StyleSheet.create({
     ...Typography.headline,
     color: Colors.text.primary,
   },
-  score: {
-    ...Typography.subheadline,
+  placeholder: {
+    width: 40,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  errorTitle: {
+    ...Typography.title2,
+    color: Colors.text.primary,
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  errorSubtitle: {
+    ...Typography.body,
     color: Colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  backButton: {
+    backgroundColor: Colors.accent.blue,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  backButtonText: {
+    ...Typography.headline,
+    color: Colors.surface,
     fontWeight: '600',
   },
   progressContainer: {
     paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 16,
+    paddingVertical: 16,
   },
   progressText: {
-    ...Typography.footnote,
+    ...Typography.subheadline,
     color: Colors.text.secondary,
+    textAlign: 'center',
     marginBottom: 8,
   },
   progressBar: {
     height: 4,
     backgroundColor: Colors.gray[200],
     borderRadius: 2,
-    overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
@@ -246,63 +357,80 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    padding: 24,
   },
-  contentContainer: {
-    paddingHorizontal: 24,
-    paddingVertical: 32,
-  },
-  question: {
-    ...Typography.title2,
-    color: Colors.text.primary,
-    marginBottom: 32,
-    lineHeight: 32,
-  },
-  optionsContainer: {
-    gap: 12,
-  },
-  option: {
+  questionCard: {
     backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 24,
+  },
+  questionText: {
+    ...Typography.title3,
+    color: Colors.text.primary,
+    lineHeight: 28,
+  },
+  answersContainer: {
+    gap: 12,
+    marginBottom: 24,
+  },
+  answerButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 16,
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: Colors.gray[200],
   },
-  optionSelected: {
+  selectedAnswer: {
     borderColor: Colors.accent.blue,
+    backgroundColor: Colors.accent.blue + '10',
   },
-  optionCorrect: {
+  correctAnswer: {
     borderColor: Colors.accent.green,
     backgroundColor: Colors.accent.green + '10',
   },
-  optionIncorrect: {
+  wrongAnswer: {
     borderColor: Colors.accent.red,
     backgroundColor: Colors.accent.red + '10',
   },
-  optionText: {
+  answerOption: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.gray[200],
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  answerLetter: {
+    ...Typography.subheadline,
+    color: Colors.text.primary,
+    fontWeight: '600',
+  },
+  answerText: {
     ...Typography.body,
     color: Colors.text.primary,
     flex: 1,
   },
-  optionTextSelected: {
+  selectedAnswerText: {
     color: Colors.accent.blue,
     fontWeight: '600',
   },
-  optionTextCorrect: {
+  correctAnswerText: {
     color: Colors.accent.green,
     fontWeight: '600',
   },
-  optionTextIncorrect: {
+  wrongAnswerText: {
     color: Colors.accent.red,
     fontWeight: '600',
   },
-  explanationContainer: {
-    marginTop: 32,
+  explanationCard: {
+    backgroundColor: Colors.accent.blue + '10',
+    borderRadius: 16,
     padding: 20,
-    backgroundColor: Colors.gray[100],
-    borderRadius: 12,
+    marginBottom: 24,
   },
   explanationTitle: {
     ...Typography.headline,
@@ -311,38 +439,101 @@ const styles = StyleSheet.create({
   },
   explanationText: {
     ...Typography.body,
-    color: Colors.text.secondary,
+    color: Colors.text.primary,
     lineHeight: 22,
   },
-  footer: {
-    padding: 24,
-    borderTopWidth: 1,
-    borderTopColor: Colors.gray[200],
+  controls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 32,
   },
-  validateButton: {
+  controlsRight: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  primaryButton: {
     backgroundColor: Colors.accent.blue,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
   },
-  validateButtonDisabled: {
-    backgroundColor: Colors.gray[300],
-  },
-  validateButtonText: {
+  primaryButtonText: {
     ...Typography.headline,
-    color: Colors.text.inverse,
+    color: Colors.surface,
+    fontWeight: '600',
   },
-  validateButtonTextDisabled: {
-    color: Colors.text.tertiary,
-  },
-  nextButton: {
-    backgroundColor: Colors.accent.green,
+  secondaryButton: {
+    backgroundColor: Colors.gray[200],
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
   },
-  nextButtonText: {
+  secondaryButtonText: {
     ...Typography.headline,
-    color: Colors.text.inverse,
+    color: Colors.text.primary,
+    fontWeight: '600',
+  },
+  resultContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  scoreCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 24,
+    padding: 40,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 300,
+  },
+  scoreTitle: {
+    ...Typography.title2,
+    color: Colors.text.primary,
+    marginTop: 16,
+    marginBottom: 24,
+  },
+  scoreText: {
+    ...Typography.largeTitle,
+    color: Colors.text.primary,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  percentageText: {
+    ...Typography.title3,
+    color: Colors.text.secondary,
+    marginBottom: 32,
+  },
+  resultActions: {
+    gap: 12,
+    width: '100%',
+  },
+  restartButton: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.accent.blue,
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  restartButtonText: {
+    ...Typography.headline,
+    color: Colors.surface,
+    fontWeight: '600',
+  },
+  finishButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.gray[200],
+    paddingVertical: 16,
+    borderRadius: 12,
+  },
+  finishButtonText: {
+    ...Typography.headline,
+    color: Colors.text.primary,
+    fontWeight: '600',
   },
 });

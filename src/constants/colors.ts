@@ -1,29 +1,34 @@
 export const Colors = {
-  primary: '#1C1C1E',      // Near black
-  secondary: '#007AFF',    // Blue accent
-  background: '#FAFAFA',   // Light gray background
-  surface: '#FFFFFF',      // White
+  primary: '#2C3E50',      // Elegant dark blue-gray
+  secondary: '#3498DB',    // Academic blue
+  background: '#FAF9F7',   // Warm off-white
+  surface: '#FFFFFF',      // Pure white
   text: {
-    primary: '#1C1C1E',
-    secondary: '#636366',
-    tertiary: '#8E8E93',
+    primary: '#2C3E50',
+    secondary: '#7F8C8D',
+    tertiary: '#95A5A6',
     inverse: '#FFFFFF',
   },
   accent: {
-    blue: '#007AFF',
-    green: '#34C759',
-    orange: '#FF9500',
-    red: '#FF3B30',
-    purple: '#5856D6',
-    pink: '#FF2D55',
-    teal: '#32ADE6',
+    blue: '#3498DB',      // Academic blue
+    green: '#27AE60',     // Success green
+    orange: '#E67E22',    // Warm orange
+    red: '#E74C3C',       // Error red
+    purple: '#9B59B6',    // Royal purple
+    yellow: '#F1C40F',    // Highlight yellow
+    teal: '#1ABC9C',      // Fresh teal
   },
   gray: {
-    100: '#F2F2F7',
-    200: '#E5E5EA',
-    300: '#D1D1D6',
-    400: '#C7C7CC',
-    500: '#8E8E93',
-    600: '#636366',
+    100: '#F8F9FA',
+    200: '#ECF0F1',
+    300: '#D5DBDB',
+    400: '#BDC3C7',
+    500: '#95A5A6',
+    600: '#7F8C8D',
+  },
+  card: {
+    background: '#FFFFFF',
+    border: '#ECF0F1',
+    shadow: 'rgba(44, 62, 80, 0.08)',
   },
 };

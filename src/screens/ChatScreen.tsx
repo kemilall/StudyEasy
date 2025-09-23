@@ -16,7 +16,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { RootStackParamList } from '../navigation/types';
-import { ChatMessage } from '../types';
+import { ChatMessage, Chapter } from '../types';
+import { AIService } from '../services/aiService';
+import { DataService } from '../services/dataService';
 
 type ChatScreenRouteProp = RouteProp<RootStackParamList, 'Chat'>;
 type ChatScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Chat'>;
@@ -24,7 +26,11 @@ type ChatScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Chat'>;
 export const ChatScreen: React.FC = () => {
   const navigation = useNavigation<ChatScreenNavigationProp>();
   const route = useRoute<ChatScreenRouteProp>();
+  const { chapterId } = route.params;
+  
   const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [chapter, setChapter] = useState<Chapter | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -35,8 +41,22 @@ export const ChatScreen: React.FC = () => {
   ]);
   const flatListRef = useRef<FlatList>(null);
 
-  const handleSend = () => {
-    if (inputText.trim() === '') return;
+  // Load chapter data on mount
+  React.useEffect(() => {
+    const loadChapter = async () => {
+      try {
+        const chapterData = await DataService.getChapter(chapterId);
+        setChapter(chapterData);
+      } catch (error) {
+        console.error('Error loading chapter:', error);
+      }
+    };
+    
+    loadChapter();
+  }, [chapterId]);
+
+  const handleSend = async () => {
+    if (inputText.trim() === '' || !chapter || isLoading) return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -45,19 +65,52 @@ export const ChatScreen: React.FC = () => {
       timestamp: new Date(),
     };
 
-    setMessages([...messages, userMessage]);
+    setMessages(prev => [...prev, userMessage]);
     setInputText('');
+    setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      // Prepare context from chapter
+      const context = `
+Chapitre: ${chapter.name}
+${chapter.transcription ? `Transcription: ${chapter.transcription}` : ''}
+${chapter.summary ? `Résumé: ${chapter.summary}` : ''}
+${chapter.keyPoints ? `Points clés: ${chapter.keyPoints.join(', ')}` : ''}
+      `.trim();
+
+      // Prepare chat history
+      const chatHistory = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
+      // Get AI response
+      const aiResponse = await AIService.chatWithCourse(
+        userMessage.content,
+        context,
+        chatHistory
+      );
+
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Je comprends votre question. Voici une explication détaillée basée sur le contenu du cours...',
+        content: aiResponse,
         timestamp: new Date(),
       };
+      
       setMessages(prev => [...prev, aiMessage]);
-    }, 1000);
+    } catch (error) {
+      console.error('Chat error:', error);
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: 'Désolé, une erreur est survenue. Veuillez réessayer.',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {

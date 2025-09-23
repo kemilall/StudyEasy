@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,27 +8,40 @@ import {
   TextInput,
   ScrollView,
   Alert,
+  ActivityIndicator,
+  FlatList,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { mockSubjects } from '../data/mockData';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
-
-type CreateLessonScreenRouteProp = RouteProp<{ params: { subjectId?: string } }, 'params'>;
+import { useAuth } from '../contexts/AuthContext';
+import { DataService } from '../services/dataService';
+import { Subject } from '../types';
 
 export const CreateLessonScreen: React.FC = () => {
   const navigation = useNavigation();
-  const route = useRoute<CreateLessonScreenRouteProp>();
-  const subjectId = route.params?.subjectId;
+  const { user } = useAuth();
   
   const [lessonName, setLessonName] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState(
-    subjectId ? mockSubjects.find(s => s.id === subjectId) : mockSubjects[0]
-  );
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
 
-  const handleCreate = () => {
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubscribe = DataService.subscribeToUserSubjects(user.uid, (userSubjects) => {
+      setSubjects(userSubjects);
+      setIsLoadingSubjects(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleCreate = async () => {
     if (!lessonName.trim()) {
       Alert.alert('Erreur', 'Veuillez entrer un nom pour la leçon.');
       return;
@@ -39,12 +52,56 @@ export const CreateLessonScreen: React.FC = () => {
       return;
     }
 
-    Alert.alert(
-      'Leçon créée !',
-      `La leçon "${lessonName}" a été créée dans ${selectedSubject.name}.`,
-      [{ text: 'OK', onPress: () => navigation.goBack() }]
-    );
+    if (!user) {
+      Alert.alert('Erreur', 'Vous devez être connecté pour créer une leçon.');
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      await DataService.createLesson(user.uid, {
+        subjectId: selectedSubject.id,
+        name: lessonName.trim(),
+        description: description.trim() || undefined,
+        chaptersCount: 0,
+        completedChapters: 0,
+        duration: 0,
+      });
+
+      Alert.alert(
+        'Leçon créée !',
+        `La leçon "${lessonName}" a été créée avec succès.`,
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+    } catch (error) {
+      console.error('Error creating lesson:', error);
+      Alert.alert('Erreur', 'Impossible de créer la leçon. Veuillez réessayer.');
+    } finally {
+      setIsCreating(false);
+    }
   };
+
+  const renderSubjectItem = ({ item }: { item: Subject }) => (
+    <TouchableOpacity
+      style={[
+        styles.subjectItem,
+        selectedSubject?.id === item.id && styles.subjectItemSelected,
+        { borderColor: item.color }
+      ]}
+      onPress={() => setSelectedSubject(item)}
+    >
+      <View style={[styles.subjectIcon, { backgroundColor: item.color + '20' }]}>
+        <Ionicons name="book" size={20} color={item.color} />
+      </View>
+      <View style={styles.subjectInfo}>
+        <Text style={styles.subjectName}>{item.name}</Text>
+        <Text style={styles.subjectLessons}>{item.lessonsCount} leçons</Text>
+      </View>
+      {selectedSubject?.id === item.id && (
+        <Ionicons name="checkmark-circle" size={24} color={item.color} />
+      )}
+    </TouchableOpacity>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -58,48 +115,50 @@ export const CreateLessonScreen: React.FC = () => {
         <Text style={styles.title}>Nouvelle leçon</Text>
         <TouchableOpacity 
           onPress={handleCreate}
-          style={[styles.saveButton, !lessonName.trim() && styles.saveButtonDisabled]}
-          disabled={!lessonName.trim()}
+          style={[styles.saveButton, (!lessonName.trim() || !selectedSubject || isCreating) && styles.saveButtonDisabled]}
+          disabled={!lessonName.trim() || !selectedSubject || isCreating}
         >
-          <Text style={[styles.saveButtonText, !lessonName.trim() && styles.saveButtonTextDisabled]}>
-            Créer
-          </Text>
+          {isCreating ? (
+            <ActivityIndicator size="small" color={Colors.surface} />
+          ) : (
+            <Text style={[styles.saveButtonText, (!lessonName.trim() || !selectedSubject || isCreating) && styles.saveButtonTextDisabled]}>
+              Créer
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Prévisualisation */}
-        <View style={styles.previewSection}>
-          <Text style={styles.sectionTitle}>Aperçu</Text>
-          <View style={styles.previewCard}>
-            <View style={styles.previewHeader}>
-              <Text style={styles.previewName}>
-                {lessonName || 'Nom de la leçon'}
-              </Text>
-              <Ionicons name="chevron-forward" size={20} color={Colors.text.tertiary} />
+        {/* Sélection de matière */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Matière *</Text>
+          {isLoadingSubjects ? (
+            <ActivityIndicator size="small" color={Colors.accent.blue} />
+          ) : subjects.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="library-outline" size={48} color={Colors.text.tertiary} />
+              <Text style={styles.emptyStateText}>Aucune matière trouvée</Text>
+              <Text style={styles.emptyStateSubtext}>Créez d'abord une matière</Text>
+              <TouchableOpacity 
+                style={styles.createSubjectButton}
+                onPress={() => navigation.navigate('CreateSubject' as never)}
+              >
+                <Ionicons name="add" size={20} color={Colors.accent.blue} />
+                <Text style={styles.createSubjectButtonText}>Créer une matière</Text>
+              </TouchableOpacity>
             </View>
-            
-            <View style={styles.previewInfo}>
-              <View style={styles.previewInfoItem}>
-                <Ionicons name="book-outline" size={16} color={Colors.text.secondary} />
-                <Text style={styles.previewInfoText}>0 chapitres</Text>
-              </View>
-              <View style={styles.previewInfoItem}>
-                <Ionicons name="time-outline" size={16} color={Colors.text.secondary} />
-                <Text style={styles.previewInfoText}>0 min</Text>
-              </View>
-            </View>
-            
-            <View style={styles.previewProgress}>
-              <View style={styles.previewProgressBar}>
-                <View style={styles.previewProgressFill} />
-              </View>
-              <Text style={styles.previewProgressText}>0%</Text>
-            </View>
-          </View>
+          ) : (
+            <FlatList
+              data={subjects}
+              renderItem={renderSubjectItem}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+              contentContainerStyle={styles.subjectsList}
+            />
+          )}
         </View>
 
-        {/* Informations de base */}
+        {/* Informations de la leçon */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Informations</Text>
           <View style={styles.inputGroup}>
@@ -108,7 +167,7 @@ export const CreateLessonScreen: React.FC = () => {
               style={styles.textInput}
               value={lessonName}
               onChangeText={setLessonName}
-              placeholder="Ex: Algèbre Linéaire"
+              placeholder="Ex: Algèbre linéaire"
               placeholderTextColor={Colors.text.tertiary}
             />
           </View>
@@ -119,7 +178,7 @@ export const CreateLessonScreen: React.FC = () => {
               style={[styles.textInput, styles.textArea]}
               value={description}
               onChangeText={setDescription}
-              placeholder="Décrivez le contenu de cette leçon..."
+              placeholder="Décrivez brièvement cette leçon..."
               placeholderTextColor={Colors.text.tertiary}
               multiline
               numberOfLines={3}
@@ -127,46 +186,22 @@ export const CreateLessonScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Sélection de matière */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Matière</Text>
-          <View style={styles.subjectsContainer}>
-            {mockSubjects.map((subject) => (
-              <TouchableOpacity
-                key={subject.id}
-                style={[
-                  styles.subjectOption,
-                  { backgroundColor: subject.color + '15' },
-                  selectedSubject?.id === subject.id && styles.subjectOptionSelected,
-                ]}
-                onPress={() => setSelectedSubject(subject)}
-              >
-                <View style={[styles.subjectIcon, { backgroundColor: subject.color + '25' }]}>
-                  <Ionicons name="book" size={20} color={subject.color} />
-                </View>
-                <Text style={styles.subjectName}>{subject.name}</Text>
-                {selectedSubject?.id === subject.id && (
-                  <Ionicons name="checkmark-circle" size={20} color={subject.color} />
-                )}
-              </TouchableOpacity>
-            ))}
+        {/* Aperçu */}
+        {selectedSubject && lessonName && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Aperçu</Text>
+            <View style={[styles.previewCard, { backgroundColor: selectedSubject.color + '10' }]}>
+              <View style={[styles.previewIcon, { backgroundColor: selectedSubject.color + '20' }]}>
+                <Ionicons name="book" size={24} color={selectedSubject.color} />
+              </View>
+              <View style={styles.previewContent}>
+                <Text style={styles.previewSubject}>{selectedSubject.name}</Text>
+                <Text style={styles.previewName}>{lessonName}</Text>
+                <Text style={styles.previewChapters}>0 chapitres</Text>
+              </View>
+            </View>
           </View>
-        </View>
-
-        {/* Actions rapides */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Après création</Text>
-          <TouchableOpacity style={styles.quickAction}>
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="add-circle-outline" size={24} color={Colors.accent.blue} />
-            </View>
-            <View style={styles.quickActionContent}>
-              <Text style={styles.quickActionTitle}>Créer le premier chapitre</Text>
-              <Text style={styles.quickActionSubtitle}>Commencez directement par ajouter du contenu</Text>
-            </View>
-            <Ionicons name="arrow-forward" size={20} color={Colors.text.tertiary} />
-          </TouchableOpacity>
-        </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -216,9 +251,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 24,
   },
-  previewSection: {
-    marginBottom: 32,
-  },
   section: {
     marginBottom: 32,
   },
@@ -227,65 +259,70 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     marginBottom: 16,
   },
-  previewCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  previewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  previewName: {
-    ...Typography.headline,
-    color: Colors.text.primary,
-    flex: 1,
-  },
-  previewInfo: {
-    flexDirection: 'row',
-    gap: 20,
-    marginBottom: 16,
-  },
-  previewInfoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  previewInfoText: {
-    ...Typography.footnote,
-    color: Colors.text.secondary,
-  },
-  previewProgress: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  subjectsList: {
     gap: 12,
   },
-  previewProgressBar: {
+  subjectItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: Colors.gray[200],
+  },
+  subjectItemSelected: {
+    borderWidth: 2,
+  },
+  subjectIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  subjectInfo: {
     flex: 1,
-    height: 6,
-    backgroundColor: Colors.gray[100],
-    borderRadius: 3,
-    overflow: 'hidden',
   },
-  previewProgressFill: {
-    width: '0%',
-    height: '100%',
-    backgroundColor: Colors.accent.blue,
-    borderRadius: 3,
+  subjectName: {
+    ...Typography.headline,
+    color: Colors.text.primary,
+    marginBottom: 2,
   },
-  previewProgressText: {
+  subjectLessons: {
     ...Typography.caption1,
     color: Colors.text.secondary,
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: 32,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+  },
+  emptyStateText: {
+    ...Typography.headline,
+    color: Colors.text.primary,
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  emptyStateSubtext: {
+    ...Typography.subheadline,
+    color: Colors.text.secondary,
+    marginBottom: 20,
+  },
+  createSubjectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.accent.blue + '15',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    gap: 8,
+  },
+  createSubjectButtonText: {
+    ...Typography.subheadline,
+    color: Colors.accent.blue,
     fontWeight: '600',
   },
   inputGroup: {
@@ -310,63 +347,36 @@ const styles = StyleSheet.create({
     height: 80,
     textAlignVertical: 'top',
   },
-  subjectsContainer: {
-    gap: 12,
-  },
-  subjectOption: {
+  previewCard: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderRadius: 16,
-    borderWidth: 2,
-    borderColor: 'transparent',
   },
-  subjectOptionSelected: {
-    borderColor: Colors.accent.blue,
-  },
-  subjectIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  previewIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
-  subjectName: {
+  previewContent: {
+    flex: 1,
+  },
+  previewSubject: {
+    ...Typography.caption1,
+    color: Colors.text.secondary,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  previewName: {
     ...Typography.headline,
     color: Colors.text.primary,
-    flex: 1,
-  },
-  quickAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    padding: 16,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  quickActionIcon: {
-    marginRight: 12,
-  },
-  quickActionContent: {
-    flex: 1,
-  },
-  quickActionTitle: {
-    ...Typography.subheadline,
-    color: Colors.text.primary,
-    fontWeight: '600',
     marginBottom: 4,
   },
-  quickActionSubtitle: {
-    ...Typography.footnote,
+  previewChapters: {
+    ...Typography.caption1,
     color: Colors.text.secondary,
   },
 });
-
