@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +16,7 @@ import { Typography } from '../constants/typography';
 import { useAuth } from '../contexts/AuthContext';
 import { DataService } from '../services/dataService';
 import { Subject, Lesson, Chapter } from '../types';
+import { LessonCard } from '../components/LessonCard';
 
 export const SubjectScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -26,6 +28,7 @@ export const SubjectScreen: React.FC = () => {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [recentChapters, setRecentChapters] = useState<Chapter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
     if (!user || !subjectId) return;
@@ -83,42 +86,23 @@ export const SubjectScreen: React.FC = () => {
     return 'book-outline';
   };
 
+  const handleDeleteLesson = async (lessonId: string) => {
+    try {
+      await DataService.deleteLesson(lessonId);
+    } catch (error) {
+      console.error('Error deleting lesson:', error);
+      Alert.alert('Erreur', 'Impossible de supprimer la leçon. Veuillez réessayer.');
+    }
+  };
+
   const renderLesson = (lesson: Lesson) => (
-    <TouchableOpacity
+    <LessonCard
       key={lesson.id}
-      style={styles.lessonCard}
-      activeOpacity={0.7}
-      onPress={() => navigation.navigate('Lesson' as never, { lessonId: lesson.id })}
-    >
-      <View style={styles.lessonContent}>
-        <View style={styles.lessonHeader}>
-          <Text style={styles.lessonName} numberOfLines={1}>{lesson.name}</Text>
-          <View style={styles.lessonStats}>
-            <Ionicons name="document-text-outline" size={14} color={Colors.text.tertiary} />
-            <Text style={styles.lessonChapters}>
-              {lesson.chaptersCount || 0} leçons
-            </Text>
-          </View>
-        </View>
-        <View style={styles.lessonProgress}>
-          <View style={styles.progressBar}>
-            <View 
-              style={[
-                styles.progressFill, 
-                { 
-                  width: `${lesson.chaptersCount ? ((lesson.completedChapters || 0) / lesson.chaptersCount) * 100 : 0}%`,
-                  backgroundColor: subject?.color || Colors.accent.blue
-                }
-              ]} 
-            />
-          </View>
-          <Text style={styles.progressText}>
-            {lesson.completedChapters || 0}/{lesson.chaptersCount || 0} terminés
-          </Text>
-        </View>
-      </View>
-      <Ionicons name="chevron-forward" size={20} color={Colors.text.tertiary} />
-    </TouchableOpacity>
+      lesson={lesson}
+      onPress={() => (navigation as any).navigate('Lesson', { lessonId: lesson.id })}
+      onDelete={() => handleDeleteLesson(lesson.id)}
+      editMode={editMode}
+    />
   );
 
   const renderRecentChapter = (chapter: Chapter) => (
@@ -126,7 +110,7 @@ export const SubjectScreen: React.FC = () => {
       key={chapter.id}
       style={styles.chapterCard}
       activeOpacity={0.7}
-      onPress={() => navigation.navigate('Chapter' as never, { chapterId: chapter.id })}
+      onPress={() => (navigation as any).navigate('Chapter', { chapterId: chapter.id })}
     >
       <View style={[styles.chapterIndicator, { backgroundColor: subject?.color || Colors.accent.blue }]} />
       <Text style={styles.chapterName} numberOfLines={2}>{chapter.name}</Text>
@@ -207,13 +191,31 @@ export const SubjectScreen: React.FC = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Chapitres</Text>
-            <TouchableOpacity 
-              style={styles.addButton}
-              onPress={() => navigation.navigate('CreateLesson' as never, { subjectId })}
-            >
-              <Ionicons name="add-circle" size={20} color={Colors.accent.blue} />
-              <Text style={styles.addButtonText}>Nouvelle</Text>
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              {lessons.length > 0 && (
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() => setEditMode(!editMode)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons 
+                    name={editMode ? "checkmark" : "create-outline"} 
+                    size={18} 
+                    color={editMode ? Colors.accent.green : Colors.accent.blue} 
+                  />
+                  <Text style={[styles.editButtonText, { color: editMode ? Colors.accent.green : Colors.accent.blue }]}>
+                    {editMode ? 'OK' : 'Modifier'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity 
+                style={styles.addButton}
+                onPress={() => (navigation as any).navigate('CreateLesson', { subjectId })}
+              >
+                <Ionicons name="add-circle" size={20} color={Colors.accent.blue} />
+                <Text style={styles.addButtonText}>Nouvelle</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {lessons.length === 0 ? (
@@ -225,7 +227,7 @@ export const SubjectScreen: React.FC = () => {
               </Text>
               <TouchableOpacity 
                 style={styles.createButton}
-                onPress={() => navigation.navigate('CreateLesson' as never, { subjectId })}
+                onPress={() => (navigation as any).navigate('CreateLesson', { subjectId })}
               >
                 <Text style={styles.createButtonText}>Créer un chapitre</Text>
               </TouchableOpacity>
@@ -324,8 +326,27 @@ const styles = StyleSheet.create({
     ...Typography.title2,
     color: Colors.text.primary,
     fontWeight: '700',
-    paddingHorizontal: 20,
-    marginBottom: 16,
+    flex: 1,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    gap: 4,
+  },
+  editButtonText: {
+    ...Typography.caption1,
+    fontWeight: '600',
   },
   addButton: {
     flexDirection: 'row',

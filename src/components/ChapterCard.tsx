@@ -1,19 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Chapter } from '../types';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
+import { ConfirmationModal } from './ConfirmationModal';
 
 interface ChapterCardProps {
   chapter: Chapter;
   onPress: () => void;
   onUpload?: () => void;
+  onDelete?: () => void;
+  editMode?: boolean;
 }
 
-export const ChapterCard: React.FC<ChapterCardProps> = ({ chapter, onPress, onUpload }) => {
+export const ChapterCard: React.FC<ChapterCardProps> = ({ chapter, onPress, onUpload, onDelete, editMode = false }) => {
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  const handleDelete = () => {
+    setShowDeleteModal(false);
+    onDelete?.();
+  };
   const renderContent = () => {
-    if (chapter.isProcessing) {
+    if (chapter.status === 'processing') {
       return (
         <View style={styles.processingContainer}>
           <ActivityIndicator size="small" color={Colors.accent.blue} />
@@ -75,10 +84,37 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({ chapter, onPress, onUp
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.name}>{chapter.name}</Text>
-      {renderContent()}
-    </View>
+    <>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.name}>{chapter.name}</Text>
+          {editMode && onDelete && (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => setShowDeleteModal(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons 
+                name="trash-outline" 
+                size={18} 
+                color={Colors.accent.red} 
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+        {renderContent()}
+      </View>
+
+      <ConfirmationModal
+        visible={showDeleteModal}
+        title="Supprimer le chapitre"
+        message={`Êtes-vous sûr de vouloir supprimer le chapitre "${chapter.name}" ? Toutes les données associées (transcription, résumé, flashcards, quiz) seront définitivement perdues.`}
+        confirmText="Supprimer"
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteModal(false)}
+        isDestructive
+      />
+    </>
   );
 };
 
@@ -97,10 +133,21 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   name: {
     ...Typography.headline,
     color: Colors.text.primary,
-    marginBottom: 12,
+    flex: 1,
+  },
+  deleteButton: {
+    padding: 4,
+    borderRadius: 8,
+    backgroundColor: Colors.accent.red + '10',
   },
   processingContainer: {
     flexDirection: 'row',
@@ -130,11 +177,6 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     gap: 12,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   statusIcon: {
     width: 20,

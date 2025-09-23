@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +16,7 @@ import { Typography } from '../constants/typography';
 import { useAuth } from '../contexts/AuthContext';
 import { DataService } from '../services/dataService';
 import { Lesson, Chapter, Subject } from '../types';
+import { ChapterCard } from '../components/ChapterCard';
 
 export const LessonScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -26,6 +28,7 @@ export const LessonScreen: React.FC = () => {
   const [subject, setSubject] = useState<Subject | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
     if (!user || !lessonId) return;
@@ -58,35 +61,27 @@ export const LessonScreen: React.FC = () => {
     return () => unsubscribe();
   }, [user, lessonId]);
 
+  const handleDeleteChapter = async (chapterId: string) => {
+    try {
+      await DataService.deleteChapter(chapterId);
+    } catch (error) {
+      console.error('Error deleting chapter:', error);
+      Alert.alert('Erreur', 'Impossible de supprimer le chapitre. Veuillez réessayer.');
+    }
+  };
+
   const renderChapter = (chapter: Chapter, index: number) => (
-    <TouchableOpacity
+    <ChapterCard
       key={chapter.id}
-      style={styles.chapterCard}
-      activeOpacity={0.7}
-      onPress={() => navigation.navigate('Chapter' as never, { chapterId: chapter.id })}
-    >
-      <View style={styles.chapterContent}>
-        <View style={styles.chapterNumber}>
-          <Text style={styles.chapterNumberText}>{index + 1}</Text>
-        </View>
-        <View style={styles.chapterInfo}>
-          <Text style={styles.chapterName} numberOfLines={2}>{chapter.name}</Text>
-          <View style={styles.chapterMeta}>
-            <View style={styles.metaItem}>
-              <Ionicons name="time-outline" size={14} color={Colors.text.tertiary} />
-              <Text style={styles.metaText}>{chapter.duration || 45} min</Text>
-            </View>
-            {chapter.isCompleted && (
-              <View style={[styles.metaItem, styles.completedBadge]}>
-                <Ionicons name="checkmark-circle" size={14} color={Colors.accent.green} />
-                <Text style={[styles.metaText, { color: Colors.accent.green }]}>Terminé</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </View>
-      <Ionicons name="chevron-forward" size={20} color={Colors.text.tertiary} />
-    </TouchableOpacity>
+      chapter={chapter}
+      onPress={() => (navigation as any).navigate('Chapter', { chapterId: chapter.id })}
+      onUpload={() => (navigation as any).navigate('AudioImport', { 
+        lessonId,
+        chapterId: chapter.id
+      })}
+      onDelete={() => handleDeleteChapter(chapter.id)}
+      editMode={editMode}
+    />
   );
 
   if (!lesson || isLoading) {
@@ -168,7 +163,7 @@ export const LessonScreen: React.FC = () => {
           <TouchableOpacity 
             style={styles.actionButton}
             activeOpacity={0.7}
-            onPress={() => navigation.navigate('AudioImport' as never, { 
+            onPress={() => (navigation as any).navigate('AudioImport', { 
               lessonId,
               chapterName: `Chapitre ${chapters.length + 1}`
             })}
@@ -182,7 +177,7 @@ export const LessonScreen: React.FC = () => {
           <TouchableOpacity 
             style={styles.actionButton}
             activeOpacity={0.7}
-            onPress={() => navigation.navigate('AudioImport' as never, { 
+            onPress={() => (navigation as any).navigate('AudioImport', { 
               lessonId,
               chapterName: `Chapitre ${chapters.length + 1}`
             })}
@@ -196,7 +191,7 @@ export const LessonScreen: React.FC = () => {
           <TouchableOpacity 
             style={styles.actionButton}
             activeOpacity={0.7}
-            onPress={() => navigation.navigate('CreateChapter' as never, { lessonId })}
+            onPress={() => (navigation as any).navigate('CreateChapter', { lessonId })}
           >
             <View style={styles.actionIconContainer}>
               <Ionicons name="document-text" size={20} color={Colors.accent.green} />
@@ -207,7 +202,25 @@ export const LessonScreen: React.FC = () => {
 
         {/* Chapters Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Leçons</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Leçons</Text>
+            {chapters.length > 0 && (
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={() => setEditMode(!editMode)}
+                activeOpacity={0.8}
+              >
+                <Ionicons 
+                  name={editMode ? "checkmark" : "create-outline"} 
+                  size={18} 
+                  color={editMode ? Colors.accent.green : Colors.accent.blue} 
+                />
+                <Text style={[styles.editButtonText, { color: editMode ? Colors.accent.green : Colors.accent.blue }]}>
+                  {editMode ? 'OK' : 'Modifier'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
           
           {chapters.length === 0 ? (
             <View style={styles.emptyCard}>
@@ -375,11 +388,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 32,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   sectionTitle: {
     ...Typography.title2,
     color: Colors.text.primary,
     fontWeight: '700',
-    marginBottom: 16,
+    flex: 1,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    gap: 4,
+  },
+  editButtonText: {
+    ...Typography.caption1,
+    fontWeight: '600',
   },
   chaptersContainer: {
     gap: 12,

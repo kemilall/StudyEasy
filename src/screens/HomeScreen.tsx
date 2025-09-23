@@ -17,7 +17,6 @@ import { Typography } from '../constants/typography';
 import { Subject, Chapter } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { DataService } from '../services/dataService';
-import { CourseCard } from '../components/CourseCard';
 
 const { width } = Dimensions.get('window');
 
@@ -30,154 +29,6 @@ export const HomeScreen: React.FC = () => {
   const [isLoadingSubjects, setIsLoadingSubjects] = useState<boolean>(false);
   const [isLoadingChapters, setIsLoadingChapters] = useState<boolean>(false);
 
-  // Mock data for development/testing - useMemo to prevent re-creation
-  const mockSubjects = React.useMemo(() => [
-    {
-      id: '1',
-      name: 'Mathématiques',
-      color: Colors.accent.blue,
-      lessonsCount: 12,
-      completedLessons: 8,
-      userId: user?.uid || '',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '2',
-      name: 'Physique',
-      color: Colors.accent.green,
-      lessonsCount: 9,
-      completedLessons: 3,
-      userId: user?.uid || '',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '3',
-      name: 'Histoire',
-      color: Colors.accent.orange,
-      lessonsCount: 15,
-      completedLessons: 10,
-      userId: user?.uid || '',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '4',
-      name: 'Chimie',
-      color: Colors.accent.purple,
-      lessonsCount: 7,
-      completedLessons: 2,
-      userId: user?.uid || '',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  ], [user?.uid]);
-
-  const mockChapters = React.useMemo(() => [
-    {
-      id: '1',
-      name: 'Les équations du second degré',
-      content: '',
-      summary: '',
-      progress: 75,
-      isCompleted: false,
-      duration: 45,
-      lessonId: '1',
-      userId: user?.uid || '',
-      createdAt: new Date(Date.now() - 86400000), // Yesterday
-      updatedAt: new Date(Date.now() - 86400000),
-      subjectName: 'Mathématiques',
-      subjectColor: Colors.accent.blue,
-      lessonName: 'Algèbre avancée',
-      subjectId: '1',
-    } as any,
-    {
-      id: '2',
-      name: 'La révolution française',
-      content: '',
-      summary: '',
-      progress: 100,
-      isCompleted: true,
-      duration: 60,
-      lessonId: '2',
-      userId: user?.uid || '',
-      createdAt: new Date(Date.now() - 172800000), // 2 days ago
-      updatedAt: new Date(Date.now() - 172800000),
-      subjectName: 'Histoire',
-      subjectColor: Colors.accent.orange,
-      lessonName: 'Histoire moderne',
-      subjectId: '3',
-    } as any,
-    {
-      id: '3',
-      name: 'Forces et mouvements',
-      content: '',
-      summary: '',
-      progress: 30,
-      isCompleted: false,
-      duration: 50,
-      lessonId: '3',
-      userId: user?.uid || '',
-      createdAt: new Date(Date.now() - 259200000), // 3 days ago
-      updatedAt: new Date(Date.now() - 259200000),
-      subjectName: 'Physique',
-      subjectColor: Colors.accent.green,
-      lessonName: 'Mécanique',
-      subjectId: '2',
-    } as any,
-    {
-      id: '4',
-      name: 'Liaisons chimiques',
-      content: '',
-      summary: '',
-      progress: 60,
-      isCompleted: false,
-      duration: 40,
-      lessonId: '4',
-      userId: user?.uid || '',
-      createdAt: new Date(Date.now() - 345600000), // 4 days ago
-      updatedAt: new Date(Date.now() - 345600000),
-      subjectName: 'Chimie',
-      subjectColor: Colors.accent.purple,
-      lessonName: 'Chimie générale',
-      subjectId: '4',
-    } as any,
-    {
-      id: '5',
-      name: 'Dérivées et primitives',
-      content: '',
-      summary: '',
-      progress: 90,
-      isCompleted: false,
-      duration: 55,
-      lessonId: '5',
-      userId: user?.uid || '',
-      createdAt: new Date(Date.now() - 432000000), // 5 days ago
-      updatedAt: new Date(Date.now() - 432000000),
-      subjectName: 'Mathématiques',
-      subjectColor: Colors.accent.blue,
-      lessonName: 'Analyse',
-      subjectId: '1',
-    } as any,
-    {
-      id: '6',
-      name: 'Les guerres mondiales',
-      content: '',
-      summary: '',
-      progress: 45,
-      isCompleted: false,
-      duration: 65,
-      lessonId: '6',
-      userId: user?.uid || '',
-      createdAt: new Date(Date.now() - 518400000), // 6 days ago
-      updatedAt: new Date(Date.now() - 518400000),
-      subjectName: 'Histoire',
-      subjectColor: Colors.accent.orange,
-      lessonName: 'Histoire contemporaine',
-      subjectId: '3',
-    } as any,
-  ], [user?.uid]);
 
   useEffect(() => {
     if (!user) return;
@@ -201,11 +52,11 @@ export const HomeScreen: React.FC = () => {
       unsubscribeSubjects();
       unsubscribeChapters();
     };
-  }, [user?.uid]); // Only depend on user ID, not the mock data objects
+  }, [user?.uid]);
 
-  // Use mock data if no real data is available
-  const displaySubjects = subjects.length > 0 ? subjects : mockSubjects;
-  const displayChapters = recentChapters.length > 0 ? recentChapters : mockChapters;
+  // Use real data only
+  const displaySubjects = subjects;
+  const displayChapters = recentChapters;
 
   const renderSubjectItem = ({ item }: { item: Subject }) => {
     // Choose different icons for different subjects

@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -19,6 +20,7 @@ import { SubjectsStackParamList } from '../navigation/types';
 import { useAuth } from '../contexts/AuthContext';
 import { DataService } from '../services/dataService';
 import { Subject } from '../types';
+import { SubjectCard } from '../components/SubjectCard';
 
 type SubjectsListNavigationProp = StackNavigationProp<SubjectsStackParamList, 'SubjectsList'>;
 
@@ -27,6 +29,7 @@ export const SubjectsListScreen: React.FC = () => {
   const { user } = useAuth();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [editMode, setEditMode] = useState(false);
   const { width } = Dimensions.get('window');
   const CARD_GAP = 12;
   const H_PADDING = 20;
@@ -43,35 +46,24 @@ export const SubjectsListScreen: React.FC = () => {
     return () => unsubscribe();
   }, [user]);
 
-  const getSubjectIcon = (name: string) => {
-    const lowercaseName = name.toLowerCase();
-    if (lowercaseName.includes('math')) return 'calculator-outline';
-    if (lowercaseName.includes('physi')) return 'planet-outline';
-    if (lowercaseName.includes('chimi')) return 'flask-outline';
-    if (lowercaseName.includes('histoi')) return 'library-outline';
-    if (lowercaseName.includes('géo')) return 'earth-outline';
-    if (lowercaseName.includes('bio')) return 'leaf-outline';
-    if (lowercaseName.includes('info')) return 'code-slash-outline';
-    if (lowercaseName.includes('anglais') || lowercaseName.includes('english')) return 'language-outline';
-    return 'book-outline';
+  const handleDeleteSubject = async (subjectId: string) => {
+    try {
+      await DataService.deleteSubject(subjectId);
+    } catch (error) {
+      console.error('Error deleting subject:', error);
+      Alert.alert('Erreur', 'Impossible de supprimer la matière. Veuillez réessayer.');
+    }
   };
 
   const renderSubject = ({ item }: { item: Subject }) => (
-    <TouchableOpacity
-      style={[styles.subjectTile, { width: CARD_WIDTH }]}
-      activeOpacity={0.7}
-      onPress={() => navigation.navigate('Subject', { subjectId: item.id })}
-    >
-      <View style={styles.subjectTileContent}>
-        <Ionicons 
-          name={getSubjectIcon(item.name) as any} 
-          size={22} 
-          color={item.color} 
-          style={{ marginRight: 10 }}
-        />
-        <Text style={styles.subjectTileName} numberOfLines={2}>{item.name}</Text>
-      </View>
-    </TouchableOpacity>
+    <View style={{ width: CARD_WIDTH }}>
+      <SubjectCard
+        subject={item}
+        onPress={() => navigation.navigate('Subject', { subjectId: item.id })}
+        onDelete={() => handleDeleteSubject(item.id)}
+        editMode={editMode}
+      />
+    </View>
   );
 
   if (isLoading) {
@@ -98,14 +90,34 @@ export const SubjectsListScreen: React.FC = () => {
           <View>
             {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.title}>Mes Matières</Text>
-              <Text style={styles.subtitle}>Gérez vos cours par matière</Text>
+              <View style={styles.headerTop}>
+                <View style={styles.titleContainer}>
+                  <Text style={styles.title}>Mes Matières</Text>
+                  <Text style={styles.subtitle}>Gérez vos cours par matière</Text>
+                </View>
+                {subjects.length > 0 && (
+                  <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={() => setEditMode(!editMode)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons 
+                      name={editMode ? "checkmark" : "create-outline"} 
+                      size={20} 
+                      color={editMode ? Colors.accent.green : Colors.accent.blue} 
+                    />
+                    <Text style={[styles.editButtonText, { color: editMode ? Colors.accent.green : Colors.accent.blue }]}>
+                      {editMode ? 'Terminer' : 'Modifier'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
             {/* Create Subject Button */}
             <TouchableOpacity 
               style={styles.createButton} 
               activeOpacity={0.7}
-              onPress={() => navigation.navigate('CreateSubject' as never)}
+              onPress={() => (navigation as any).navigate('CreateSubject')}
             >
               <View style={styles.createIconContainer}>
                 <Ionicons name="add-circle" size={24} color={Colors.accent.blue} />
@@ -144,6 +156,14 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 24,
   },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  titleContainer: {
+    flex: 1,
+  },
   title: {
     ...Typography.largeTitle,
     color: Colors.text.primary,
@@ -153,6 +173,21 @@ const styles = StyleSheet.create({
   subtitle: {
     ...Typography.body,
     color: Colors.text.secondary,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    gap: 6,
+  },
+  editButtonText: {
+    ...Typography.footnote,
+    fontWeight: '600',
   },
   createButton: {
     flexDirection: 'row',

@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Modal,
-  ActivityIndicator,
+  TouchableOpacity,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
@@ -17,108 +17,63 @@ interface ConfirmationModalProps {
   message: string;
   confirmText?: string;
   cancelText?: string;
+  confirmColor?: string;
   onConfirm: () => void;
   onCancel: () => void;
-  isLoading?: boolean;
-  doubleConfirmation?: boolean;
-  doubleConfirmText?: string;
-  doubleConfirmMessage?: string;
+  isDestructive?: boolean;
 }
 
 export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   visible,
   title,
   message,
-  confirmText = 'Supprimer',
+  confirmText = 'Confirmer',
   cancelText = 'Annuler',
+  confirmColor,
   onConfirm,
   onCancel,
-  isLoading = false,
-  doubleConfirmation = false,
-  doubleConfirmText = 'Confirmer la suppression',
-  doubleConfirmMessage = 'Cette action est irréversible. Êtes-vous vraiment sûr ?',
+  isDestructive = false,
 }) => {
-  const [step, setStep] = useState<'first' | 'second'>('first');
-
-  const handleConfirm = () => {
-    if (doubleConfirmation && step === 'first') {
-      setStep('second');
-    } else {
-      onConfirm();
-    }
-  };
-
-  const handleCancel = () => {
-    if (doubleConfirmation && step === 'second') {
-      setStep('first');
-    } else {
-      onCancel();
-    }
-  };
-
-  const handleModalClose = () => {
-    setStep('first');
-    onCancel();
-  };
-
-  const currentTitle = step === 'first' ? title : doubleConfirmText;
-  const currentMessage = step === 'first' ? message : doubleConfirmMessage;
-  const currentConfirmText = step === 'first' && doubleConfirmation ? 'Continuer' : confirmText;
+  const buttonColor = confirmColor || (isDestructive ? Colors.accent.red : Colors.accent.blue);
 
   return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={handleModalClose}
+      statusBarTranslucent
     >
       <View style={styles.overlay}>
+        <Pressable style={styles.backdrop} onPress={onCancel} />
         <View style={styles.container}>
           <View style={styles.header}>
-            <View style={styles.iconContainer}>
-              <Ionicons
-                name={step === 'first' ? 'warning-outline' : 'trash-outline'}
-                size={24}
-                color={step === 'first' ? Colors.accent.orange : Colors.accent.red}
+            <View style={[styles.iconContainer, { backgroundColor: buttonColor + '20' }]}>
+              <Ionicons 
+                name={isDestructive ? "warning" : "help-circle"} 
+                size={24} 
+                color={buttonColor} 
               />
             </View>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={handleModalClose}
-              disabled={isLoading}
-            >
-              <Ionicons name="close" size={24} color={Colors.text.tertiary} />
-            </TouchableOpacity>
+            <Text style={styles.title}>{title}</Text>
           </View>
-
-          <View style={styles.content}>
-            <Text style={styles.title}>{currentTitle}</Text>
-            <Text style={styles.message}>{currentMessage}</Text>
-          </View>
-
+          
+          <Text style={styles.message}>{message}</Text>
+          
           <View style={styles.actions}>
             <TouchableOpacity
               style={[styles.button, styles.cancelButton]}
-              onPress={handleCancel}
-              disabled={isLoading}
+              onPress={onCancel}
+              activeOpacity={0.8}
             >
-              <Text style={styles.cancelButtonText}>{cancelText}</Text>
+              <Text style={styles.cancelText}>{cancelText}</Text>
             </TouchableOpacity>
-
+            
             <TouchableOpacity
-              style={[
-                styles.button,
-                styles.confirmButton,
-                step === 'second' && styles.dangerButton
-              ]}
-              onPress={handleConfirm}
-              disabled={isLoading}
+              style={[styles.button, styles.confirmButton, { backgroundColor: buttonColor }]}
+              onPress={onConfirm}
+              activeOpacity={0.8}
             >
-              {isLoading ? (
-                <ActivityIndicator size="small" color={Colors.surface} />
-              ) : (
-                <Text style={styles.confirmButtonText}>{currentConfirmText}</Text>
-              )}
+              <Text style={styles.confirmText}>{confirmText}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -130,51 +85,48 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   container: {
     backgroundColor: Colors.surface,
     borderRadius: 20,
     padding: 24,
-    width: '100%',
-    maxWidth: 400,
-    shadowColor: Colors.card.shadow,
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.5,
+    marginHorizontal: 20,
+    maxWidth: 340,
+    width: '90%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 10,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.gray[100],
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  content: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   title: {
     ...Typography.title2,
     color: Colors.text.primary,
-    fontWeight: '700',
-    marginBottom: 8,
     textAlign: 'center',
   },
   message: {
@@ -182,37 +134,36 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     textAlign: 'center',
     lineHeight: 22,
+    marginBottom: 24,
   },
   actions: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     gap: 12,
+    marginTop: 8,
   },
   button: {
     flex: 1,
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 12,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 48,
   },
   cancelButton: {
     backgroundColor: Colors.gray[100],
-    borderWidth: 1,
-    borderColor: Colors.gray[200],
-  },
-  cancelButtonText: {
-    ...Typography.headline,
-    color: Colors.text.primary,
-    fontWeight: '600',
   },
   confirmButton: {
-    backgroundColor: Colors.accent.blue,
+    // backgroundColor set dynamically
   },
-  dangerButton: {
-    backgroundColor: Colors.accent.red,
+  cancelText: {
+    ...Typography.subheadline,
+    color: Colors.text.secondary,
+    fontWeight: '600',
   },
-  confirmButtonText: {
-    ...Typography.headline,
+  confirmText: {
+    ...Typography.subheadline,
     color: Colors.surface,
     fontWeight: '600',
   },
