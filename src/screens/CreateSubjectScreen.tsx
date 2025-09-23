@@ -60,18 +60,15 @@ export const CreateSubjectScreen: React.FC = () => {
 
     setIsCreating(true);
     try {
-      await DataService.createSubject(user.uid, {
+      const subjectId = await DataService.createSubject(user.uid, {
         name: subjectName.trim(),
         color: selectedColor,
         lessonsCount: 0,
         completedLessons: 0,
       });
 
-      Alert.alert(
-        'Matière créée !',
-        `La matière "${subjectName}" a été créée avec succès.`,
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
+      // Navigate directly to the subject page
+      navigation.navigate('Subject' as never, { subjectId } as never);
     } catch (error) {
       console.error('Error creating subject:', error);
       Alert.alert('Erreur', 'Impossible de créer la matière. Veuillez réessayer.');
@@ -117,7 +114,7 @@ export const CreateSubjectScreen: React.FC = () => {
               <Text style={styles.previewName}>
                 {subjectName || 'Nom de la matière'}
               </Text>
-              <Text style={styles.previewLessons}>0 leçons</Text>
+              <Text style={styles.previewLessons}>0 chapitres</Text>
             </View>
           </View>
         </View>

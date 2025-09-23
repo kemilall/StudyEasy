@@ -4,18 +4,17 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  FlatList,
+  ScrollView,
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { ChapterCard } from '../components/ChapterCard';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { useAuth } from '../contexts/AuthContext';
 import { DataService } from '../services/dataService';
-import { Lesson, Chapter } from '../types';
+import { Lesson, Chapter, Subject } from '../types';
 
 export const LessonScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -24,6 +23,7 @@ export const LessonScreen: React.FC = () => {
   const { lessonId } = route.params as { lessonId: string };
   
   const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [subject, setSubject] = useState<Subject | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -35,6 +35,13 @@ export const LessonScreen: React.FC = () => {
       try {
         const lessonData = await DataService.getLesson(lessonId);
         setLesson(lessonData);
+        
+        // Load subject data
+        if (lessonData) {
+          const subjects = await DataService.getUserSubjects(user.uid);
+          const foundSubject = subjects.find(s => s.id === lessonData.subjectId);
+          setSubject(foundSubject || null);
+        }
       } catch (error) {
         console.error('Error loading lesson:', error);
       }
@@ -51,14 +58,38 @@ export const LessonScreen: React.FC = () => {
     return () => unsubscribe();
   }, [user, lessonId]);
 
-  const renderChapter = ({ item }: { item: Chapter }) => (
-    <ChapterCard
-      chapter={item}
-      onPress={() => navigation.navigate('Chapter' as never, { chapterId: item.id })}
-    />
+  const renderChapter = (chapter: Chapter, index: number) => (
+    <TouchableOpacity
+      key={chapter.id}
+      style={styles.chapterCard}
+      activeOpacity={0.7}
+      onPress={() => navigation.navigate('Chapter' as never, { chapterId: chapter.id })}
+    >
+      <View style={styles.chapterContent}>
+        <View style={styles.chapterNumber}>
+          <Text style={styles.chapterNumberText}>{index + 1}</Text>
+        </View>
+        <View style={styles.chapterInfo}>
+          <Text style={styles.chapterName} numberOfLines={2}>{chapter.name}</Text>
+          <View style={styles.chapterMeta}>
+            <View style={styles.metaItem}>
+              <Ionicons name="time-outline" size={14} color={Colors.text.tertiary} />
+              <Text style={styles.metaText}>{chapter.duration || 45} min</Text>
+            </View>
+            {chapter.isCompleted && (
+              <View style={[styles.metaItem, styles.completedBadge]}>
+                <Ionicons name="checkmark-circle" size={14} color={Colors.accent.green} />
+                <Text style={[styles.metaText, { color: Colors.accent.green }]}>Terminé</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color={Colors.text.tertiary} />
+    </TouchableOpacity>
   );
 
-  if (!lesson) {
+  if (!lesson || isLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -68,70 +99,131 @@ export const LessonScreen: React.FC = () => {
     );
   }
 
+  const progress = lesson.chaptersCount ? Math.round(((lesson.completedChapters || 0) / lesson.chaptersCount) * 100) : 0;
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
-        </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.lessonName}>{lesson.name}</Text>
-          <Text style={styles.lessonStats}>
-            {lesson.chaptersCount} chapitres • {lesson.completedChapters} terminés
-          </Text>
-          {lesson.description && (
-            <Text style={styles.lessonDescription}>{lesson.description}</Text>
-          )}
-        </View>
-      </View>
-
-      <View style={styles.content}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Chapitres</Text>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
           <TouchableOpacity 
-            style={styles.addButton}
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+          </TouchableOpacity>
+          
+          <View style={styles.headerContent}>
+            {subject && (
+              <View style={[styles.subjectBadge, { backgroundColor: subject.color + '15' }]}>
+                <Text style={[styles.subjectBadgeText, { color: subject.color }]}>
+                  {subject.name}
+                </Text>
+              </View>
+            )}
+            <Text style={styles.lessonName}>{lesson.name}</Text>
+            {lesson.description && (
+              <Text style={styles.lessonDescription}>{lesson.description}</Text>
+            )}
+          </View>
+        </View>
+
+        {/* Progress Card */}
+        <View style={styles.progressCard}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressTitle}>Progression</Text>
+            <Text style={styles.progressPercent}>{progress}%</Text>
+          </View>
+          <View style={styles.progressBarContainer}>
+            <View 
+              style={[
+                styles.progressBarFill, 
+                { 
+                  width: `${progress}%`,
+                  backgroundColor: subject?.color || Colors.accent.blue
+                }
+              ]} 
+            />
+          </View>
+          <View style={styles.progressStats}>
+            <View style={styles.progressStat}>
+              <Text style={styles.progressStatValue}>{lesson.chaptersCount || 0}</Text>
+              <Text style={styles.progressStatLabel}>Leçons</Text>
+            </View>
+            <View style={styles.progressDivider} />
+            <View style={styles.progressStat}>
+              <Text style={styles.progressStatValue}>{lesson.completedChapters || 0}</Text>
+              <Text style={styles.progressStatLabel}>Terminés</Text>
+            </View>
+            <View style={styles.progressDivider} />
+            <View style={styles.progressStat}>
+              <Text style={styles.progressStatValue}>{lesson.duration || 0}</Text>
+              <Text style={styles.progressStatLabel}>Minutes</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Action Buttons */}
+        <View style={styles.actionButtons}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            activeOpacity={0.7}
             onPress={() => navigation.navigate('AudioImport' as never, { 
               lessonId,
               chapterName: `Chapitre ${chapters.length + 1}`
             })}
           >
-            <Ionicons name="add" size={20} color={Colors.accent.blue} />
-            <Text style={styles.addButtonText}>Ajouter</Text>
+            <View style={styles.actionIconContainer}>
+              <Ionicons name="mic" size={20} color={Colors.accent.red} />
+            </View>
+            <Text style={styles.actionButtonText}>Enregistrer</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.actionButton}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('AudioImport' as never, { 
+              lessonId,
+              chapterName: `Chapitre ${chapters.length + 1}`
+            })}
+          >
+            <View style={styles.actionIconContainer}>
+              <Ionicons name="volume-high" size={20} color={Colors.accent.blue} />
+            </View>
+            <Text style={styles.actionButtonText}>Importer audio</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.actionButton}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('CreateChapter' as never, { lessonId })}
+          >
+            <View style={styles.actionIconContainer}>
+              <Ionicons name="document-text" size={20} color={Colors.accent.green} />
+            </View>
+            <Text style={styles.actionButtonText}>Importer texte</Text>
           </TouchableOpacity>
         </View>
 
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.accent.blue} />
-          </View>
-        ) : chapters.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="document-outline" size={64} color={Colors.text.tertiary} />
-            <Text style={styles.emptyTitle}>Aucun chapitre</Text>
-            <Text style={styles.emptySubtitle}>Importez un audio ou un texte pour créer votre premier chapitre</Text>
-            <TouchableOpacity 
-              style={styles.createChapterButton}
-              onPress={() => navigation.navigate('AudioImport' as never, { 
-                lessonId,
-                chapterName: 'Chapitre 1'
-              })}
-            >
-              <Text style={styles.createChapterButtonText}>Importer un audio</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <FlatList
-            data={chapters}
-            renderItem={renderChapter}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.chaptersList}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
-      </View>
+        {/* Chapters Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Leçons</Text>
+          
+          {chapters.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Ionicons name="folder-open-outline" size={48} color={Colors.text.tertiary} />
+              <Text style={styles.emptyTitle}>Aucune leçon</Text>
+              <Text style={styles.emptySubtitle}>
+                Commencez par enregistrer ou importer votre première leçon
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.chaptersContainer}>
+              {chapters.map((chapter, index) => renderChapter(chapter, index))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -141,11 +233,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   header: {
-    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingTop: 16,
     paddingBottom: 24,
-    paddingHorizontal: 24,
-    backgroundColor: Colors.surface,
   },
   backButton: {
     width: 40,
@@ -156,16 +252,24 @@ const styles = StyleSheet.create({
   headerContent: {
     alignItems: 'center',
   },
+  subjectBadge: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  subjectBadgeText: {
+    ...Typography.caption1,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   lessonName: {
     ...Typography.title1,
     color: Colors.text.primary,
-    marginBottom: 8,
+    fontWeight: '800',
     textAlign: 'center',
-  },
-  lessonStats: {
-    ...Typography.subheadline,
-    color: Colors.text.secondary,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   lessonDescription: {
     ...Typography.body,
@@ -173,76 +277,202 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
-  content: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    marginTop: -24,
-    paddingTop: 24,
+  progressCard: {
+    backgroundColor: Colors.surface,
+    marginHorizontal: 20,
+    marginBottom: 24,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: Colors.card.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  sectionHeader: {
+  progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    marginBottom: 16,
+    marginBottom: 12,
+  },
+  progressTitle: {
+    ...Typography.headline,
+    color: Colors.text.primary,
+    fontWeight: '700',
+  },
+  progressPercent: {
+    ...Typography.title2,
+    color: Colors.text.primary,
+    fontWeight: '700',
+  },
+  progressBarContainer: {
+    height: 8,
+    backgroundColor: Colors.gray[200],
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 20,
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  progressStat: {
+    alignItems: 'center',
+  },
+  progressStatValue: {
+    ...Typography.title3,
+    color: Colors.text.primary,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  progressStatLabel: {
+    ...Typography.caption1,
+    color: Colors.text.secondary,
+  },
+  progressDivider: {
+    width: 1,
+    backgroundColor: Colors.gray[200],
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    gap: 12,
+    marginBottom: 32,
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    shadowColor: Colors.card.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  actionIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: Colors.gray[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  actionButtonText: {
+    ...Typography.caption1,
+    color: Colors.text.primary,
+    fontWeight: '700',
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 32,
   },
   sectionTitle: {
     ...Typography.title2,
     color: Colors.text.primary,
+    fontWeight: '700',
+    marginBottom: 16,
   },
-  addButton: {
+  chaptersContainer: {
+    gap: 12,
+  },
+  chapterCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.accent.blue + '15',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    shadowColor: Colors.card.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  chapterContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  chapterNumber: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
+    backgroundColor: Colors.gray[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  chapterNumberText: {
+    ...Typography.headline,
+    color: Colors.text.primary,
+    fontWeight: '700',
+  },
+  chapterInfo: {
+    flex: 1,
+  },
+  chapterName: {
+    ...Typography.headline,
+    color: Colors.text.primary,
+    fontWeight: '600',
+    marginBottom: 6,
+    lineHeight: 22,
+  },
+  chapterMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
   },
-  addButtonText: {
-    ...Typography.subheadline,
-    color: Colors.accent.blue,
-    fontWeight: '600',
+  metaText: {
+    ...Typography.caption1,
+    color: Colors.text.tertiary,
   },
-  chaptersList: {
-    paddingHorizontal: 24,
-    paddingBottom: 100,
+  completedBadge: {
+    backgroundColor: Colors.accent.green + '15',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  emptyCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    padding: 48,
     alignItems: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    shadowColor: Colors.card.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 16,
+    elevation: 3,
   },
   emptyTitle: {
-    ...Typography.title2,
+    ...Typography.title3,
     color: Colors.text.primary,
-    marginTop: 24,
+    fontWeight: '700',
+    marginTop: 16,
     marginBottom: 8,
   },
   emptySubtitle: {
     ...Typography.body,
     color: Colors.text.secondary,
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  createChapterButton: {
-    backgroundColor: Colors.accent.blue,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  createChapterButtonText: {
-    ...Typography.headline,
-    color: Colors.surface,
-    fontWeight: '600',
+    lineHeight: 24,
   },
 });

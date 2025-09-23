@@ -38,39 +38,45 @@ export const CreateChapterScreen: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
-    const loadLessons = async () => {
+    const init = async () => {
       try {
-        // We need to get all lessons for the user
-        // This is a limitation - we should create a method to get all user lessons
-        setIsLoading(false);
+        if (routeLessonId) {
+          // Preselect lesson from route and skip list UI
+          const lesson = await DataService.getLesson(routeLessonId);
+          if (lesson) setSelectedLesson(lesson);
+          setIsLoading(false);
+        } else {
+          // TODO: Optionally fetch lessons list if this screen is used standalone
+          setIsLoading(false);
+        }
       } catch (error) {
-        console.error('Error loading lessons:', error);
+        console.error('Error initializing create chapter screen:', error);
         setIsLoading(false);
       }
     };
 
-    loadLessons();
-  }, [user]);
+    init();
+  }, [user, routeLessonId]);
 
   const handleCreate = async () => {
     if (!chapterName.trim()) {
-      Alert.alert('Erreur', 'Veuillez entrer un nom pour le chapitre.');
+      Alert.alert('Erreur', 'Veuillez entrer un nom pour la leçon.');
       return;
     }
 
-    if (!selectedLesson) {
-      Alert.alert('Erreur', 'Veuillez sélectionner une leçon.');
+    if (!selectedLesson && !routeLessonId) {
+      Alert.alert('Erreur', 'Chapitre introuvable.');
       return;
     }
 
     if (!user) {
-      Alert.alert('Erreur', 'Vous devez être connecté pour créer un chapitre.');
+      Alert.alert('Erreur', 'Vous devez être connecté pour créer une leçon.');
       return;
     }
 
     // Instead of creating here, navigate to AudioImport
     navigation.navigate('AudioImport' as never, {
-      lessonId: selectedLesson.id,
+      lessonId: (selectedLesson?.id || routeLessonId) as string,
       chapterName: chapterName.trim()
     });
   };
@@ -85,7 +91,7 @@ export const CreateChapterScreen: React.FC = () => {
     >
       <View style={styles.lessonInfo}>
         <Text style={styles.lessonName}>{item.name}</Text>
-        <Text style={styles.lessonChapters}>{item.chaptersCount} chapitres</Text>
+          <Text style={styles.lessonChapters}>{item.chaptersCount} leçons</Text>
       </View>
       {selectedLesson?.id === item.id && (
         <Ionicons name="checkmark-circle" size={24} color={Colors.accent.blue} />
@@ -102,7 +108,7 @@ export const CreateChapterScreen: React.FC = () => {
         >
           <Ionicons name="close" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.title}>Nouveau chapitre</Text>
+        <Text style={styles.title}>Nouvelle leçon</Text>
         <TouchableOpacity 
           onPress={handleCreate}
           style={[styles.saveButton, (!chapterName.trim() || !selectedLesson || isCreating) && styles.saveButtonDisabled]}
@@ -123,7 +129,7 @@ export const CreateChapterScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Informations</Text>
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Nom du chapitre *</Text>
+            <Text style={styles.inputLabel}>Nom de la leçon *</Text>
             <TextInput
               style={styles.textInput}
               value={chapterName}
@@ -134,34 +140,36 @@ export const CreateChapterScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Lesson Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Leçon *</Text>
-          {isLoading ? (
-            <ActivityIndicator size="small" color={Colors.accent.blue} />
-          ) : lessons.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="book-outline" size={48} color={Colors.text.tertiary} />
-              <Text style={styles.emptyStateText}>Aucune leçon trouvée</Text>
-              <Text style={styles.emptyStateSubtext}>Créez d'abord une leçon</Text>
-              <TouchableOpacity 
-                style={styles.createLessonButton}
-                onPress={() => navigation.navigate('CreateLesson' as never)}
-              >
-                <Ionicons name="add" size={20} color={Colors.accent.blue} />
-                <Text style={styles.createLessonButtonText}>Créer une leçon</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <FlatList
-              data={lessons}
-              renderItem={renderLessonItem}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-              contentContainerStyle={styles.lessonsList}
-            />
-          )}
-        </View>
+        {/* Lesson Selection (hidden when lessonId is provided) */}
+        {!routeLessonId && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Chapitre *</Text>
+            {isLoading ? (
+              <ActivityIndicator size="small" color={Colors.accent.blue} />
+            ) : lessons.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="book-outline" size={48} color={Colors.text.tertiary} />
+                <Text style={styles.emptyStateText}>Aucun chapitre trouvé</Text>
+                <Text style={styles.emptyStateSubtext}>Créez d'abord un chapitre</Text>
+                <TouchableOpacity 
+                  style={styles.createLessonButton}
+                  onPress={() => navigation.navigate('CreateLesson' as never)}
+                >
+                  <Ionicons name="add" size={20} color={Colors.accent.blue} />
+                  <Text style={styles.createLessonButtonText}>Créer un chapitre</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <FlatList
+                data={lessons}
+                renderItem={renderLessonItem}
+                keyExtractor={(item) => item.id}
+                scrollEnabled={false}
+                contentContainerStyle={styles.lessonsList}
+              />
+            )}
+          </View>
+        )}
 
         {/* Next Steps Info */}
         <View style={styles.infoCard}>
@@ -171,7 +179,7 @@ export const CreateChapterScreen: React.FC = () => {
           <View style={styles.infoContent}>
             <Text style={styles.infoTitle}>Prochaine étape</Text>
             <Text style={styles.infoText}>
-              Après avoir créé ce chapitre, vous pourrez importer un fichier audio ou texte 
+          Après avoir créé cette leçon, vous pourrez importer un fichier audio ou texte 
               qui sera automatiquement traité par l'IA pour générer le contenu d'apprentissage.
             </Text>
           </View>

@@ -7,11 +7,12 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ActivityIndicator,
+  ScrollView,
+  Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { SubjectCard } from '../components/SubjectCard';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { SubjectsStackParamList } from '../navigation/types';
@@ -26,6 +27,10 @@ export const SubjectsListScreen: React.FC = () => {
   const { user } = useAuth();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { width } = Dimensions.get('window');
+  const CARD_GAP = 12;
+  const H_PADDING = 20;
+  const CARD_WIDTH = Math.floor((width - H_PADDING * 2 - CARD_GAP) / 2);
 
   useEffect(() => {
     if (!user) return;
@@ -38,59 +43,93 @@ export const SubjectsListScreen: React.FC = () => {
     return () => unsubscribe();
   }, [user]);
 
+  const getSubjectIcon = (name: string) => {
+    const lowercaseName = name.toLowerCase();
+    if (lowercaseName.includes('math')) return 'calculator-outline';
+    if (lowercaseName.includes('physi')) return 'planet-outline';
+    if (lowercaseName.includes('chimi')) return 'flask-outline';
+    if (lowercaseName.includes('histoi')) return 'library-outline';
+    if (lowercaseName.includes('géo')) return 'earth-outline';
+    if (lowercaseName.includes('bio')) return 'leaf-outline';
+    if (lowercaseName.includes('info')) return 'code-slash-outline';
+    if (lowercaseName.includes('anglais') || lowercaseName.includes('english')) return 'language-outline';
+    return 'book-outline';
+  };
+
   const renderSubject = ({ item }: { item: Subject }) => (
-    <SubjectCard
-      subject={item}
+    <TouchableOpacity
+      style={[styles.subjectTile, { width: CARD_WIDTH }]}
+      activeOpacity={0.7}
       onPress={() => navigation.navigate('Subject', { subjectId: item.id })}
-    />
+    >
+      <View style={styles.subjectTileContent}>
+        <Ionicons 
+          name={getSubjectIcon(item.name) as any} 
+          size={22} 
+          color={item.color} 
+          style={{ marginRight: 10 }}
+        />
+        <Text style={styles.subjectTileName} numberOfLines={2}>{item.name}</Text>
+      </View>
+    </TouchableOpacity>
   );
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Matières</Text>
-        <TouchableOpacity style={styles.searchButton}>
-          <Ionicons name="search" size={24} color={Colors.text.primary} />
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity 
-        style={styles.createSubjectButton} 
-        activeOpacity={0.8}
-        onPress={() => navigation.navigate('CreateSubject' as never)}
-      >
-        <View style={styles.createSubjectIcon}>
-          <Ionicons name="add" size={24} color={Colors.accent.blue} />
-        </View>
-        <View style={styles.createSubjectContent}>
-          <Text style={styles.createSubjectTitle}>Créer une nouvelle matière</Text>
-          <Text style={styles.createSubjectSubtitle}>Organisez vos cours par sujet</Text>
-        </View>
-        <Ionicons name="arrow-forward" size={20} color={Colors.text.tertiary} />
-      </TouchableOpacity>
-
-      {isLoading ? (
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.accent.blue} />
         </View>
-      ) : subjects.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="library-outline" size={64} color={Colors.text.tertiary} />
-          <Text style={styles.emptyTitle}>Aucune matière</Text>
-          <Text style={styles.emptySubtitle}>Créez votre première matière pour commencer vos études</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={subjects}
-          renderItem={renderSubject}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          columnWrapperStyle={styles.row}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+      </SafeAreaView>
+    );
+  }
 
+  return (
+    <SafeAreaView style={styles.container}>
+      <FlatList
+        data={subjects}
+        keyExtractor={(item) => item.id}
+        renderItem={renderSubject}
+        numColumns={2}
+        columnWrapperStyle={{ gap: CARD_GAP, paddingHorizontal: H_PADDING, marginBottom: CARD_GAP }}
+        contentContainerStyle={{ paddingBottom: 32 }}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <View>
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.title}>Mes Matières</Text>
+              <Text style={styles.subtitle}>Gérez vos cours par matière</Text>
+            </View>
+            {/* Create Subject Button */}
+            <TouchableOpacity 
+              style={styles.createButton} 
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('CreateSubject' as never)}
+            >
+              <View style={styles.createIconContainer}>
+                <Ionicons name="add-circle" size={24} color={Colors.accent.blue} />
+              </View>
+              <View style={styles.createTextContainer}>
+                <Text style={styles.createTitle}>Nouvelle matière</Text>
+                <Text style={styles.createSubtitle}>Organisez vos cours par sujet</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={Colors.text.tertiary} />
+            </TouchableOpacity>
+          </View>
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <View style={styles.emptyCard}>
+              <Ionicons name="school-outline" size={64} color={Colors.text.tertiary} />
+              <Text style={styles.emptyTitle}>Aucune matière</Text>
+              <Text style={styles.emptySubtitle}>
+                Créez votre première matière pour commencer à organiser vos cours
+              </Text>
+            </View>
+          </View>
+        }
+      />
     </SafeAreaView>
   );
 };
@@ -101,89 +140,126 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 16,
+    paddingBottom: 24,
   },
   title: {
     ...Typography.largeTitle,
     color: Colors.text.primary,
+    fontWeight: '800',
+    marginBottom: 4,
   },
-  searchButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+  subtitle: {
+    ...Typography.body,
+    color: Colors.text.secondary,
   },
-  listContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 100,
-  },
-  row: {
-    gap: 16,
-  },
-  createSubjectButton: {
+  createButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
-    marginHorizontal: 24,
-    marginBottom: 24,
+    marginHorizontal: 20,
+    marginBottom: 32,
     padding: 20,
     borderRadius: 16,
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    shadowColor: Colors.card.shadow,
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  createSubjectIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.accent.blue + '15',
+  createIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: Colors.gray[100],
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
   },
-  createSubjectContent: {
+  createTextContainer: {
     flex: 1,
   },
-  createSubjectTitle: {
+  createTitle: {
     ...Typography.headline,
     color: Colors.text.primary,
-    marginBottom: 4,
+    fontWeight: '700',
+    marginBottom: 2,
   },
-  createSubjectSubtitle: {
-    ...Typography.subheadline,
+  createSubtitle: {
+    ...Typography.footnote,
     color: Colors.text.secondary,
   },
-  loadingContainer: {
+  subjectsContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+  },
+  subjectTile: {
+    height: 80,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    shadowColor: Colors.card.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  subjectTileContent: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  subjectTileName: {
+    ...Typography.subheadline,
+    color: Colors.text.primary,
+    fontWeight: '700',
+    lineHeight: 20,
+    flex: 1,
+  },
+  loadingContainer: {
+    height: 200,
     justifyContent: 'center',
     alignItems: 'center',
   },
   emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 40,
+  },
+  emptyCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 24,
+    padding: 48,
     alignItems: 'center',
-    paddingHorizontal: 32,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    shadowColor: Colors.card.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 1,
+    shadowRadius: 16,
+    elevation: 3,
   },
   emptyTitle: {
     ...Typography.title2,
     color: Colors.text.primary,
-    marginTop: 24,
+    fontWeight: '700',
+    marginTop: 16,
     marginBottom: 8,
   },
   emptySubtitle: {
     ...Typography.body,
     color: Colors.text.secondary,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 24,
   },
 });

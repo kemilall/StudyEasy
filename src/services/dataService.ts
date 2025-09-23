@@ -460,7 +460,7 @@ export class DataService {
               ...chapter,
               subjectName,
               subjectColor,
-              lessonName: lesson?.name || 'Leçon inconnue',
+              lessonName: lesson?.name || 'Chapitre inconnu',
               subjectId: lesson?.subjectId || '',
             };
           } catch (error) {
@@ -469,7 +469,7 @@ export class DataService {
               ...chapter,
               subjectName: 'Matière inconnue',
               subjectColor: '#3498DB',
-              lessonName: 'Leçon inconnue',
+              lessonName: 'Chapitre inconnu',
               subjectId: '',
             };
           }
@@ -522,7 +522,7 @@ export class DataService {
               ...chapter,
               subjectName,
               subjectColor,
-              lessonName: lesson?.name || 'Leçon inconnue',
+              lessonName: lesson?.name || 'Chapitre inconnu',
               subjectId: lesson?.subjectId || '',
             };
           } catch (error) {
@@ -531,7 +531,7 @@ export class DataService {
               ...chapter,
               subjectName: 'Matière inconnue',
               subjectColor: '#3498DB',
-              lessonName: 'Leçon inconnue',
+              lessonName: 'Chapitre inconnu',
               subjectId: '',
             };
           }

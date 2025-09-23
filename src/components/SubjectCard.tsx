@@ -28,7 +28,7 @@ export const SubjectCard: React.FC<SubjectCardProps> = ({ subject, onPress }) =>
           {subject.name}
         </Text>
         <Text style={styles.stats}>
-          {subject.completedLessons} / {subject.lessonsCount} leçons
+          {subject.completedLessons} / {subject.lessonsCount} chapitres
         </Text>
       </View>
       

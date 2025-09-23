@@ -39,7 +39,7 @@ export const LessonCard: React.FC<LessonCardProps> = ({ lesson, onPress }) => {
               color={Colors.text.secondary} 
             />
             <Text style={styles.infoText}>
-              {lesson.completedChapters}/{lesson.chaptersCount} chapitres
+              {lesson.completedChapters}/{lesson.chaptersCount} leçons
             </Text>
           </View>
           

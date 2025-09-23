@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   FlatList,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
@@ -21,6 +21,7 @@ import { Subject } from '../types';
 
 export const CreateLessonScreen: React.FC = () => {
   const navigation = useNavigation();
+  const route = useRoute();
   const { user } = useAuth();
   
   const [lessonName, setLessonName] = useState('');
@@ -29,6 +30,7 @@ export const CreateLessonScreen: React.FC = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
+  const routeSubjectId = (route.params as { subjectId?: string } | undefined)?.subjectId;
 
   useEffect(() => {
     if (!user) return;
@@ -36,31 +38,36 @@ export const CreateLessonScreen: React.FC = () => {
     const unsubscribe = DataService.subscribeToUserSubjects(user.uid, (userSubjects) => {
       setSubjects(userSubjects);
       setIsLoadingSubjects(false);
+      if (routeSubjectId && !selectedSubject) {
+        const found = userSubjects.find(s => s.id === routeSubjectId) || null;
+        setSelectedSubject(found);
+      }
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, routeSubjectId]);
 
   const handleCreate = async () => {
     if (!lessonName.trim()) {
-      Alert.alert('Erreur', 'Veuillez entrer un nom pour la leçon.');
+      Alert.alert('Erreur', 'Veuillez entrer un nom pour le chapitre.');
       return;
     }
 
-    if (!selectedSubject) {
-      Alert.alert('Erreur', 'Veuillez sélectionner une matière.');
+    const subjectIdToUse = selectedSubject?.id || routeSubjectId;
+    if (!subjectIdToUse) {
+      Alert.alert('Erreur', 'Matière introuvable.');
       return;
     }
 
     if (!user) {
-      Alert.alert('Erreur', 'Vous devez être connecté pour créer une leçon.');
+      Alert.alert('Erreur', 'Vous devez être connecté pour créer un chapitre.');
       return;
     }
 
     setIsCreating(true);
     try {
-      await DataService.createLesson(user.uid, {
-        subjectId: selectedSubject.id,
+      const lessonId = await DataService.createLesson(user.uid, {
+        subjectId: subjectIdToUse,
         name: lessonName.trim(),
         description: description.trim() || undefined,
         chaptersCount: 0,
@@ -68,14 +75,11 @@ export const CreateLessonScreen: React.FC = () => {
         duration: 0,
       });
 
-      Alert.alert(
-        'Leçon créée !',
-        `La leçon "${lessonName}" a été créée avec succès.`,
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
+      // Navigate directly to the lesson page
+      navigation.navigate('Lesson' as never, { lessonId } as never);
     } catch (error) {
       console.error('Error creating lesson:', error);
-      Alert.alert('Erreur', 'Impossible de créer la leçon. Veuillez réessayer.');
+      Alert.alert('Erreur', 'Impossible de créer le chapitre. Veuillez réessayer.');
     } finally {
       setIsCreating(false);
     }
@@ -129,34 +133,36 @@ export const CreateLessonScreen: React.FC = () => {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Sélection de matière */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Matière *</Text>
-          {isLoadingSubjects ? (
-            <ActivityIndicator size="small" color={Colors.accent.blue} />
-          ) : subjects.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="library-outline" size={48} color={Colors.text.tertiary} />
-              <Text style={styles.emptyStateText}>Aucune matière trouvée</Text>
-              <Text style={styles.emptyStateSubtext}>Créez d'abord une matière</Text>
-              <TouchableOpacity 
-                style={styles.createSubjectButton}
-                onPress={() => navigation.navigate('CreateSubject' as never)}
-              >
-                <Ionicons name="add" size={20} color={Colors.accent.blue} />
-                <Text style={styles.createSubjectButtonText}>Créer une matière</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <FlatList
-              data={subjects}
-              renderItem={renderSubjectItem}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-              contentContainerStyle={styles.subjectsList}
-            />
-          )}
-        </View>
+        {/* Sélection de matière (masquée si subjectId est fourni) */}
+        {!routeSubjectId && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Matière *</Text>
+            {isLoadingSubjects ? (
+              <ActivityIndicator size="small" color={Colors.accent.blue} />
+            ) : subjects.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="library-outline" size={48} color={Colors.text.tertiary} />
+                <Text style={styles.emptyStateText}>Aucune matière trouvée</Text>
+                <Text style={styles.emptyStateSubtext}>Créez d'abord une matière</Text>
+                <TouchableOpacity 
+                  style={styles.createSubjectButton}
+                  onPress={() => navigation.navigate('CreateSubject' as never)}
+                >
+                  <Ionicons name="add" size={20} color={Colors.accent.blue} />
+                  <Text style={styles.createSubjectButtonText}>Créer une matière</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <FlatList
+                data={subjects}
+                renderItem={renderSubjectItem}
+                keyExtractor={(item) => item.id}
+                scrollEnabled={false}
+                contentContainerStyle={styles.subjectsList}
+              />
+            )}
+          </View>
+        )}
 
         {/* Informations de la leçon */}
         <View style={styles.section}>
