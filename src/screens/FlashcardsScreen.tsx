@@ -15,15 +15,15 @@ import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { useAuth } from '../contexts/AuthContext';
 import { DataService } from '../services/dataService';
-import { Chapter, Flashcard } from '../types';
+import { Lesson, Flashcard } from '../types';
 
 export const FlashcardsScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { user } = useAuth();
-  const { chapterId } = route.params as { chapterId: string };
-  
-  const [chapter, setChapter] = useState<Chapter | null>(null);
+  const { lessonId } = route.params as { lessonId: string };
+
+  const [lesson, setLesson] = useState<Lesson | null>(null);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -31,24 +31,24 @@ export const FlashcardsScreen: React.FC = () => {
   const flipAnimation = new Animated.Value(0);
 
   useEffect(() => {
-    if (!user || !chapterId) return;
+    if (!user || !lessonId) return;
 
-    const loadChapter = async () => {
+    const loadLesson = async () => {
       try {
-        const chapterData = await DataService.getChapter(chapterId);
-        setChapter(chapterData);
-        if (chapterData?.flashcards) {
-          setFlashcards(chapterData.flashcards);
+        const lessonData = await DataService.getLesson(lessonId);
+        setLesson(lessonData);
+        if (lessonData?.flashcards) {
+          setFlashcards(lessonData.flashcards);
         }
         setIsLoading(false);
       } catch (error) {
-        console.error('Error loading chapter:', error);
+        console.error('Error loading lesson:', error);
         setIsLoading(false);
       }
     };
 
-    loadChapter();
-  }, [user, chapterId]);
+    loadLesson();
+  }, [user, lessonId]);
 
   const flipCard = () => {
     if (isFlipped) {

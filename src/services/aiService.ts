@@ -1,4 +1,4 @@
-import { Flashcard, QuizQuestion, Chapter, Lesson, Subject } from '../types';
+import { Flashcard, QuizQuestion, Lesson, Subject } from '../types';
 import { DataService } from './dataService';
 import { API_BASE_URL } from '../config/api';
 
@@ -241,9 +241,9 @@ export class AIService {
         explanation: q.explanation,
       }));
       
-      // Update chapter in Firebase with the generated content
+      // Update lesson in Firebase with the generated content
       if (chapterId) {
-        await DataService.updateChapter(chapterId, {
+        await DataService.updateLesson(chapterId, {
           transcription: data.transcription,
           summary: data.summary,
           keyPoints: data.key_points,

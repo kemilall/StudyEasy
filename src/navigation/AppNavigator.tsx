@@ -9,7 +9,6 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { SubjectsListScreen } from '../screens/SubjectsListScreen';
 import { SubjectScreen } from '../screens/SubjectScreen';
 import { LessonScreen } from '../screens/LessonScreen';
-import { ChapterScreen } from '../screens/ChapterScreen';
 import { TranscriptionScreen } from '../screens/TranscriptionScreen';
 import { FlashcardsScreen } from '../screens/FlashcardsScreen';
 import { QuizScreen } from '../screens/QuizScreen';
@@ -18,7 +17,6 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { AudioImportScreen } from '../screens/AudioImportScreen';
 import { CreateSubjectScreen } from '../screens/CreateSubjectScreen';
 import { CreateLessonScreen } from '../screens/CreateLessonScreen';
-import { CreateChapterScreen } from '../screens/CreateChapterScreen';
 import { ProcessingScreen } from '../screens/ProcessingScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { SignUpScreen } from '../screens/SignUpScreen';
@@ -130,7 +128,7 @@ const AppStack = () => {
       }}
     >
       <Stack.Screen name="MainTabs" component={MainTabs} />
-      <Stack.Screen name="Chapter" component={ChapterScreen} />
+      <Stack.Screen name="Lesson" component={LessonScreen} />
       <Stack.Screen 
         name="Transcription" 
         component={TranscriptionScreen}
@@ -176,13 +174,6 @@ const AppStack = () => {
       <Stack.Screen 
         name="CreateLesson" 
         component={CreateLessonScreen}
-        options={{
-          presentation: 'modal',
-        }}
-      />
-      <Stack.Screen 
-        name="CreateChapter" 
-        component={CreateChapterScreen}
         options={{
           presentation: 'modal',
         }}

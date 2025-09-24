@@ -15,7 +15,7 @@ import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { useAuth } from '../contexts/AuthContext';
 import { DataService } from '../services/dataService';
-import { Subject, Lesson, Chapter } from '../types';
+import { Subject, Lesson } from '../types';
 import { LessonCard } from '../components/LessonCard';
 
 export const SubjectScreen: React.FC = () => {
@@ -26,9 +26,8 @@ export const SubjectScreen: React.FC = () => {
   
   const [subject, setSubject] = useState<Subject | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [recentChapters, setRecentChapters] = useState<Chapter[]>([]);
+  const [recentLessons, setRecentLessons] = useState<Lesson[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
     if (!user || !subjectId) return;
@@ -48,9 +47,9 @@ export const SubjectScreen: React.FC = () => {
     const unsubscribe = DataService.subscribeToSubjectLessons(subjectId, (subjectLessons) => {
       setLessons(subjectLessons);
       setIsLoading(false);
-      
-      // Load recent chapters from these lessons
-      loadRecentChapters(subjectLessons);
+
+      // Load recent lessons from this subject
+      loadRecentLessons(subjectLessons);
     });
 
     loadSubject();
@@ -58,19 +57,13 @@ export const SubjectScreen: React.FC = () => {
     return () => unsubscribe();
   }, [user, subjectId]);
 
-  const loadRecentChapters = async (lessonsList: Lesson[]) => {
-    try {
-      const allChapters: Chapter[] = [];
-      
-      for (const lesson of lessonsList.slice(0, 3)) {
-        const chapters = await DataService.getLessonChapters(lesson.id);
-        allChapters.push(...chapters.slice(0, 2));
-      }
-      
-      setRecentChapters(allChapters.slice(0, 5));
-    } catch (error) {
-      console.error('Error loading recent chapters:', error);
-    }
+  const loadRecentLessons = (lessonsList: Lesson[]) => {
+    // Get the most recent lessons from this subject
+    const recentOnes = lessonsList
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+      .slice(0, 5);
+
+    setRecentLessons(recentOnes);
   };
 
   const getSubjectIcon = (name: string) => {
@@ -101,22 +94,21 @@ export const SubjectScreen: React.FC = () => {
       lesson={lesson}
       onPress={() => (navigation as any).navigate('Lesson', { lessonId: lesson.id })}
       onDelete={() => handleDeleteLesson(lesson.id)}
-      editMode={editMode}
     />
   );
 
-  const renderRecentChapter = (chapter: Chapter) => (
+  const renderRecentLesson = (lesson: Lesson) => (
     <TouchableOpacity
-      key={chapter.id}
-      style={styles.chapterCard}
+      key={lesson.id}
+      style={styles.lessonCard}
       activeOpacity={0.7}
-      onPress={() => (navigation as any).navigate('Chapter', { chapterId: chapter.id })}
+      onPress={() => (navigation as any).navigate('Lesson', { lessonId: lesson.id })}
     >
-      <View style={[styles.chapterIndicator, { backgroundColor: subject?.color || Colors.accent.blue }]} />
-      <Text style={styles.chapterName} numberOfLines={2}>{chapter.name}</Text>
-      <View style={styles.chapterMeta}>
+      <View style={[styles.lessonIndicator, { backgroundColor: subject?.color || Colors.accent.blue }]} />
+      <Text style={styles.lessonName} numberOfLines={2}>{lesson.name}</Text>
+      <View style={styles.lessonMeta}>
         <Ionicons name="time-outline" size={12} color={Colors.text.tertiary} />
-        <Text style={styles.chapterDuration}>{chapter.duration || 45} min</Text>
+        <Text style={styles.lessonDuration}>{lesson.duration || 45} min</Text>
       </View>
     </TouchableOpacity>
   );
@@ -133,7 +125,7 @@ export const SubjectScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity 
@@ -155,7 +147,7 @@ export const SubjectScreen: React.FC = () => {
             <View style={styles.statsContainer}>
               <View style={styles.stat}>
                 <Text style={styles.statValue}>{subject.lessonsCount || 0}</Text>
-                <Text style={styles.statLabel}>Chapitres</Text>
+                <Text style={styles.statLabel}>Leçons</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.stat}>
@@ -173,16 +165,18 @@ export const SubjectScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Recent Chapters */}
-        {recentChapters.length > 0 && (
+        {/* Recent Lessons */}
+        {recentLessons.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Leçons récentes</Text>
-            <ScrollView 
-              horizontal 
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Leçons récentes</Text>
+            </View>
+            <ScrollView
+              horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chaptersScroll}
+              contentContainerStyle={styles.lessonsScroll}
             >
-              {recentChapters.map(renderRecentChapter)}
+              {recentLessons.map(renderRecentLesson)}
             </ScrollView>
           </View>
         )}
@@ -190,27 +184,11 @@ export const SubjectScreen: React.FC = () => {
         {/* Lessons Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Chapitres</Text>
+            <Text style={styles.sectionTitle}>Leçons</Text>
             <View style={styles.headerActions}>
-              {lessons.length > 0 && (
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => setEditMode(!editMode)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons 
-                    name={editMode ? "checkmark" : "create-outline"} 
-                    size={18} 
-                    color={editMode ? Colors.accent.green : Colors.accent.blue} 
-                  />
-                  <Text style={[styles.editButtonText, { color: editMode ? Colors.accent.green : Colors.accent.blue }]}>
-                    {editMode ? 'OK' : 'Modifier'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.addButton}
-                onPress={() => (navigation as any).navigate('CreateLesson', { subjectId })}
+                onPress={() => (navigation as any).navigate('AudioImport', { subjectId })}
               >
                 <Ionicons name="add-circle" size={20} color={Colors.accent.blue} />
                 <Text style={styles.addButtonText}>Nouvelle</Text>
@@ -221,15 +199,15 @@ export const SubjectScreen: React.FC = () => {
           {lessons.length === 0 ? (
             <View style={styles.emptyCard}>
               <Ionicons name="book-outline" size={48} color={Colors.text.tertiary} />
-              <Text style={styles.emptyTitle}>Aucun chapitre</Text>
+              <Text style={styles.emptyTitle}>Aucune leçon</Text>
               <Text style={styles.emptySubtitle}>
-                Créez votre premier chapitre pour cette matière
+                Créez votre première leçon pour cette matière
               </Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.createButton}
-                onPress={() => (navigation as any).navigate('CreateLesson', { subjectId })}
+                onPress={() => (navigation as any).navigate('AudioImport', { subjectId })}
               >
-                <Text style={styles.createButtonText}>Créer un chapitre</Text>
+                <Text style={styles.createButtonText}>Créer une leçon</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -248,13 +226,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  scrollContent: {
+    paddingBottom: 24,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   header: {
-    paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 32,
   },
@@ -262,10 +242,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 20,
+    marginLeft: 20,
   },
   headerContent: {
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
   subjectIcon: {
     width: 80,
@@ -358,11 +341,11 @@ const styles = StyleSheet.create({
     color: Colors.accent.blue,
     fontWeight: '700',
   },
-  chaptersScroll: {
+  lessonsScroll: {
     paddingHorizontal: 20,
     gap: 12,
   },
-  chapterCard: {
+  lessonCard: {
     width: 160,
     backgroundColor: Colors.surface,
     borderRadius: 16,
@@ -373,26 +356,26 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  chapterIndicator: {
+  lessonIndicator: {
     width: 32,
     height: 4,
     borderRadius: 2,
     marginBottom: 12,
   },
-  chapterName: {
+  lessonName: {
     ...Typography.footnote,
     color: Colors.text.primary,
     fontWeight: '600',
     lineHeight: 18,
     flex: 1,
   },
-  chapterMeta: {
+  lessonMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     marginTop: 8,
   },
-  chapterDuration: {
+  lessonDuration: {
     ...Typography.caption2,
     color: Colors.text.tertiary,
   },
@@ -400,7 +383,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 12,
   },
-  lessonCard: {
+  lessonListCard: {
     backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: 16,
@@ -420,7 +403,7 @@ const styles = StyleSheet.create({
   lessonHeader: {
     marginBottom: 12,
   },
-  lessonName: {
+  lessonListName: {
     ...Typography.headline,
     color: Colors.text.primary,
     fontWeight: '700',
@@ -458,6 +441,7 @@ const styles = StyleSheet.create({
     padding: 40,
     marginHorizontal: 20,
     alignItems: 'center',
+    alignSelf: 'center',
     shadowColor: Colors.card.shadow,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 1,

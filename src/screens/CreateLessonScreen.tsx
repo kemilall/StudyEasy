@@ -64,25 +64,8 @@ export const CreateLessonScreen: React.FC = () => {
       return;
     }
 
-    setIsCreating(true);
-    try {
-      const lessonId = await DataService.createLesson(user.uid, {
-        subjectId: subjectIdToUse,
-        name: lessonName.trim(),
-        description: description.trim() || undefined,
-        chaptersCount: 0,
-        completedChapters: 0,
-        duration: 0,
-      });
-
-      // Navigate directly to the lesson page
-      navigation.navigate('Lesson' as never, { lessonId } as never);
-    } catch (error) {
-      console.error('Error creating lesson:', error);
-      Alert.alert('Erreur', 'Impossible de créer le chapitre. Veuillez réessayer.');
-    } finally {
-      setIsCreating(false);
-    }
+    // Do not save here; go to AudioImport to collect audio and process
+    navigation.navigate('AudioImport' as never, { subjectId: subjectIdToUse, initialLessonName: lessonName.trim() } as never);
   };
 
   const renderSubjectItem = ({ item }: { item: Subject }) => (
@@ -119,8 +102,8 @@ export const CreateLessonScreen: React.FC = () => {
         <Text style={styles.title}>Nouvelle leçon</Text>
         <TouchableOpacity 
           onPress={handleCreate}
-          style={[styles.saveButton, (!lessonName.trim() || !selectedSubject || isCreating) && styles.saveButtonDisabled]}
-          disabled={!lessonName.trim() || !selectedSubject || isCreating}
+          style={[styles.saveButton, (!lessonName.trim() || !selectedSubject) && styles.saveButtonDisabled]}
+          disabled={!lessonName.trim() || !selectedSubject}
         >
           {isCreating ? (
             <ActivityIndicator size="small" color={Colors.surface} />

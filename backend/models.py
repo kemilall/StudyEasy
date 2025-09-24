@@ -49,7 +49,7 @@ class ChatResponse(BaseModel):
     message: str
     timestamp: datetime
 
-class ProcessedChapter(BaseModel):
+class ProcessedLesson(BaseModel):
     transcription: str
     course: StructuredCourse
     flashcards: List[Flashcard]

@@ -9,6 +9,8 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,19 +25,23 @@ const SUBJECT_COLORS = [
   Colors.accent.orange,
   Colors.accent.red,
   Colors.accent.purple,
-  Colors.accent.pink,
+  Colors.accent.yellow,
   Colors.accent.teal,
 ];
 
 const SUBJECT_ICONS = [
-  'book',
-  'calculator',
-  'flask',
-  'telescope',
-  'language',
-  'musical-notes',
-  'brush',
-  'fitness',
+  'book-outline',
+  'calculator-outline',
+  'flask-outline',
+  'planet-outline',
+  'language-outline',
+  'musical-notes-outline',
+  'brush-outline',
+  'fitness-outline',
+  'library-outline',
+  'leaf-outline',
+  'code-slash-outline',
+  'earth-outline',
 ];
 
 export const CreateSubjectScreen: React.FC = () => {
@@ -60,15 +66,16 @@ export const CreateSubjectScreen: React.FC = () => {
 
     setIsCreating(true);
     try {
-      const subjectId = await DataService.createSubject(user.uid, {
+      await DataService.createSubject(user.uid, {
         name: subjectName.trim(),
         color: selectedColor,
+        icon: selectedIcon,
         lessonsCount: 0,
         completedLessons: 0,
       });
 
-      // Navigate directly to the subject page
-      navigation.navigate('Subject' as never, { subjectId } as never);
+      // Navigate back to the previous screen (usually the subjects list)
+      navigation.goBack();
     } catch (error) {
       console.error('Error creating subject:', error);
       Alert.alert('Erreur', 'Impossible de créer la matière. Veuillez réessayer.');
@@ -102,23 +109,17 @@ export const CreateSubjectScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Prévisualisation */}
-        <View style={styles.previewSection}>
-          <Text style={styles.sectionTitle}>Aperçu</Text>
-          <View style={[styles.previewCard, { backgroundColor: selectedColor + '15' }]}>
-            <View style={[styles.previewIcon, { backgroundColor: selectedColor + '25' }]}>
-              <Ionicons name={selectedIcon as any} size={24} color={selectedColor} />
-            </View>
-            <View style={styles.previewContent}>
-              <Text style={styles.previewName}>
-                {subjectName || 'Nom de la matière'}
-              </Text>
-              <Text style={styles.previewLessons}>0 chapitres</Text>
-            </View>
-          </View>
-        </View>
-
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
+      >
+        <ScrollView 
+          style={styles.content} 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
         {/* Informations de base */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Informations</Text>
@@ -151,9 +152,9 @@ export const CreateSubjectScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Couleur</Text>
           <View style={styles.colorGrid}>
-            {SUBJECT_COLORS.map((color) => (
+            {SUBJECT_COLORS.map((color, index) => (
               <TouchableOpacity
-                key={color}
+                key={`color-${index}-${color}`}
                 style={[
                   styles.colorOption,
                   { backgroundColor: color + '20' },
@@ -174,9 +175,9 @@ export const CreateSubjectScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Icône</Text>
           <View style={styles.iconGrid}>
-            {SUBJECT_ICONS.map((icon) => (
+            {SUBJECT_ICONS.map((icon, index) => (
               <TouchableOpacity
-                key={icon}
+                key={`icon-${index}-${icon}`}
                 style={[
                   styles.iconOption,
                   selectedIcon === icon && styles.iconOptionSelected,
@@ -192,7 +193,8 @@ export const CreateSubjectScreen: React.FC = () => {
             ))}
           </View>
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -237,12 +239,15 @@ const styles = StyleSheet.create({
   saveButtonTextDisabled: {
     color: Colors.text.tertiary,
   },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   content: {
     flex: 1,
-    padding: 24,
   },
-  previewSection: {
-    marginBottom: 32,
+  scrollContent: {
+    padding: 24,
+    paddingBottom: 40,
   },
   section: {
     marginBottom: 32,
@@ -251,32 +256,7 @@ const styles = StyleSheet.create({
     ...Typography.title3,
     color: Colors.text.primary,
     marginBottom: 16,
-  },
-  previewCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-  },
-  previewIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  previewContent: {
-    flex: 1,
-  },
-  previewName: {
-    ...Typography.headline,
-    color: Colors.text.primary,
-    marginBottom: 4,
-  },
-  previewLessons: {
-    ...Typography.caption1,
-    color: Colors.text.secondary,
+    fontWeight: '700',
   },
   inputGroup: {
     marginBottom: 20,
@@ -303,48 +283,77 @@ const styles = StyleSheet.create({
   colorGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    marginHorizontal: -6,
   },
   colorOption: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+    margin: 6,
+    shadowColor: Colors.card.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 2,
   },
   colorOptionSelected: {
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: Colors.text.primary,
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
   },
   colorCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
   colorCheck: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 6,
+    right: 6,
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   iconGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    marginHorizontal: -6,
   },
   iconOption: {
-    width: 60,
-    height: 60,
+    width: 64,
+    height: 64,
     backgroundColor: Colors.surface,
-    borderRadius: 16,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.gray[200],
+    margin: 6,
+    shadowColor: Colors.card.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
   },
   iconOptionSelected: {
+    borderWidth: 2,
     borderColor: Colors.accent.blue,
     backgroundColor: Colors.accent.blue + '10',
+    shadowOpacity: 0.4,
+    shadowRadius: 5,
   },
 });
 

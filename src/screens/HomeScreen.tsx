@@ -14,7 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
-import { Subject, Chapter } from '../types';
+import { Subject, Lesson } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { DataService } from '../services/dataService';
 
@@ -25,43 +25,48 @@ export const HomeScreen: React.FC = () => {
   const { user, userProfile } = useAuth();
 
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [recentChapters, setRecentChapters] = useState<Chapter[]>([]);
+  const [recentLessons, setRecentLessons] = useState<Lesson[]>([]);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState<boolean>(false);
-  const [isLoadingChapters, setIsLoadingChapters] = useState<boolean>(false);
+  const [isLoadingLessons, setIsLoadingLessons] = useState<boolean>(false);
 
 
   useEffect(() => {
     if (!user) return;
 
     setIsLoadingSubjects(true);
-    setIsLoadingChapters(true);
-    
+    setIsLoadingLessons(true);
+
     // Subscribe to real-time updates for user subjects
     const unsubscribeSubjects = DataService.subscribeToUserSubjects(user.uid, (updatedSubjects) => {
       setSubjects(updatedSubjects);
       setIsLoadingSubjects(false);
     });
 
-    // Subscribe to real-time updates for recent chapters
-    const unsubscribeChapters = DataService.subscribeToRecentChapters(user.uid, (updatedChapters) => {
-      setRecentChapters(updatedChapters);
-      setIsLoadingChapters(false);
-    }, 8); // Limit to 8 recent chapters
+    // Subscribe to real-time updates for recent lessons
+    const unsubscribeLessons = DataService.subscribeToRecentLessons(user.uid, (updatedLessons) => {
+      setRecentLessons(updatedLessons);
+      setIsLoadingLessons(false);
+    }, 10); // Limit to 10 recent lessons
 
     return () => {
       unsubscribeSubjects();
-      unsubscribeChapters();
+      unsubscribeLessons();
     };
   }, [user?.uid]);
 
   // Use real data only
   const displaySubjects = subjects;
-  const displayChapters = recentChapters;
+  const displayLessons = recentLessons;
 
   const renderSubjectItem = ({ item }: { item: Subject }) => {
-    // Choose different icons for different subjects
-    const getSubjectIcon = (name: string) => {
-      const lowercaseName = name.toLowerCase();
+    // Choose different icons for different subjects - use saved icon or fallback to name-based logic
+    const getSubjectIcon = (subject: Subject) => {
+      if (subject.icon) {
+        return subject.icon;
+      }
+      
+      // Fallback to name-based logic for existing subjects without icons
+      const lowercaseName = subject.name.toLowerCase();
       if (lowercaseName.includes('math')) return 'calculator-outline';
       if (lowercaseName.includes('physi')) return 'planet-outline';
       if (lowercaseName.includes('chimi')) return 'flask-outline';
@@ -81,7 +86,7 @@ export const HomeScreen: React.FC = () => {
       >
         <View style={styles.subjectCardContent}>
           <Ionicons 
-            name={getSubjectIcon(item.name) as any} 
+            name={getSubjectIcon(item) as any} 
             size={24} 
             color={item.color} 
             style={styles.subjectMainIcon}
@@ -92,16 +97,16 @@ export const HomeScreen: React.FC = () => {
     );
   };
 
-  const renderRecentCourse = (item: Chapter, index: number) => {
+  const renderRecentCourse = (item: Lesson, index: number) => {
     // Use the enriched data from the service
     const color = item.subjectColor || Colors.accent.blue;
-    
+
     // Format date
     const formatDate = (date: Date) => {
       const now = new Date();
       const diffTime = now.getTime() - date.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
+
       if (diffDays === 0) return "Aujourd'hui";
       if (diffDays === 1) return "Hier";
       if (diffDays < 7) return `Il y a ${diffDays} jours`;
@@ -115,13 +120,13 @@ export const HomeScreen: React.FC = () => {
       const mins = minutes % 60;
       return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
     };
-    
+
     return (
       <TouchableOpacity
         key={item.id}
         style={styles.courseRowCard}
         activeOpacity={0.7}
-        onPress={() => navigation.navigate('Chapter', { chapterId: item.id })}
+        onPress={() => navigation.navigate('Lesson', { lessonId: item.id })}
       >
         <View style={styles.courseRowContent}>
           <View style={styles.courseRowHeader}>
@@ -145,24 +150,24 @@ export const HomeScreen: React.FC = () => {
               </View>
             </View>
           </View>
-          
+
           <Text style={styles.courseRowTitle} numberOfLines={2}>
             {item.name}
           </Text>
-          
+
           <View style={styles.courseRowFooter}>
             <Text style={styles.courseRowProgress}>
-              {item.progress || 0}% terminé
+              {item.isCompleted ? '100' : '0'}% terminé
             </Text>
             <View style={styles.courseRowProgressBar}>
-              <View 
+              <View
                 style={[
-                  styles.courseRowProgressFill, 
-                  { 
-                    width: `${item.progress || 0}%`,
-                    backgroundColor: color 
+                  styles.courseRowProgressFill,
+                  {
+                    width: `${item.isCompleted ? 100 : 0}%`,
+                    backgroundColor: color
                   }
-                ]} 
+                ]}
               />
             </View>
           </View>
@@ -193,7 +198,7 @@ export const HomeScreen: React.FC = () => {
           <TouchableOpacity 
             style={styles.actionButton}
             activeOpacity={0.7}
-            onPress={() => navigation.navigate('AudioImport')}
+            onPress={() => navigation.navigate('Subjects', { screen: 'SubjectsList' })}
           >
             <View style={styles.actionIconContainer}>
               <Ionicons name="mic" size={24} color={Colors.accent.red} />
@@ -205,7 +210,7 @@ export const HomeScreen: React.FC = () => {
           <TouchableOpacity 
             style={styles.actionButton}
             activeOpacity={0.7}
-            onPress={() => navigation.navigate('AudioImport')}
+            onPress={() => navigation.navigate('Subjects', { screen: 'SubjectsList' })}
           >
             <View style={styles.actionIconContainer}>
               <Ionicons name="volume-high" size={24} color={Colors.accent.blue} />
@@ -264,18 +269,13 @@ export const HomeScreen: React.FC = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Cours récents</Text>
-            {displayChapters.length > 0 && (
-              <TouchableOpacity>
-                <Text style={styles.seeAllButton}>Voir tout</Text>
-              </TouchableOpacity>
-            )}
           </View>
 
-          {isLoadingChapters ? (
+          {isLoadingLessons ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={Colors.accent.blue} />
             </View>
-          ) : displayChapters.length === 0 ? (
+          ) : displayLessons.length === 0 ? (
             <View style={styles.emptyCoursesContainer}>
               <View style={styles.emptyCourseCard}>
                 <Ionicons name="book-outline" size={48} color={Colors.text.tertiary} />
@@ -287,8 +287,8 @@ export const HomeScreen: React.FC = () => {
             </View>
           ) : (
             <View style={styles.coursesColumn}>
-              {displayChapters.slice(0, 5).map((chapter, index) => 
-                renderRecentCourse(chapter, index)
+              {displayLessons.slice(0, 10).map((lesson, index) =>
+                renderRecentCourse(lesson, index)
               )}
             </View>
           )}
@@ -395,7 +395,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   subjectsList: {
-    paddingLeft: 20,
+    paddingHorizontal: 20,
+    justifyContent: 'center',
   },
   subjectCard: {
     width: 180,

@@ -12,6 +12,7 @@ export interface Subject {
   name: string;
   description?: string;
   color: string;
+  icon?: string;
   userId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -22,26 +23,13 @@ export interface Subject {
 export interface Lesson {
   id: string;
   name: string;
-  description?: string;
-  subjectId: string;
-  userId: string;
-  createdAt: Date;
-  updatedAt: Date;
-  chaptersCount?: number;
-  completedChapters?: number;
-  duration?: number;
-}
-
-export interface Chapter {
-  id: string;
-  name: string;
   content?: string;
   transcription?: string;
   summary?: string;
   keyPoints?: string[];
   flashcards?: Flashcard[];
   quiz?: QuizQuestion[];
-  lessonId: string;
+  subjectId: string;
   userId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -52,15 +40,13 @@ export interface Chapter {
   // Enhanced properties for display
   subjectName?: string;
   subjectColor?: string;
-  lessonName?: string;
-  subjectId?: string;
 }
 
 export interface Flashcard {
   id: string;
   question: string;
   answer: string;
-  chapterId?: string;
+  lessonId?: string;
   createdAt?: Date;
 }
 
@@ -70,8 +56,15 @@ export interface QuizQuestion {
   options: string[];
   correctAnswer: number;
   explanation: string;
-  chapterId?: string;
+  lessonId?: string;
   createdAt?: Date;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
 }
 
 // API Response types

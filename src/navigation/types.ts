@@ -1,17 +1,18 @@
 export type RootStackParamList = {
   MainTabs: undefined;
-  Chapter: { chapterId: string };
-  Transcription: { chapterId: string };
-  Flashcards: { chapterId: string };
-  Quiz: { chapterId: string };
-  Chat: { chapterId: string };
-  AudioImportScreen: { lessonId: string; chapterName?: string } | undefined;
+  Login: undefined;
+  SignUp: undefined;
+  Lesson: { lessonId: string };
+  Transcription: { lessonId: string };
+  Flashcards: { lessonId: string };
+  Quiz: { lessonId: string };
+  Chat: { lessonId: string };
+  AudioImport: { subjectId: string; initialLessonName?: string } | undefined;
   CreateSubject: undefined;
   CreateLesson: { subjectId?: string };
-  CreateChapter: { lessonId?: string };
   ProcessingScreen: {
-    chapterId: string;
     lessonId: string;
+    subjectId?: string;
     audioUrl?: string; // remote URL (Firebase) optional
     documentText?: string;
     localUri?: string; // local file URI to send to backend

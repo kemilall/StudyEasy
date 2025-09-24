@@ -7,13 +7,13 @@ from dotenv import load_dotenv
 import logging
 from ai_service import AIService
 from models import (
-    TranscriptionRequest, 
+    TranscriptionRequest,
     CourseGenerationRequest,
     FlashcardsRequest,
     QuizRequest,
     ChatRequest,
     ChatResponse,
-    ProcessedChapter
+    ProcessedLesson
 )
 
 # Load environment variables
@@ -42,7 +42,7 @@ ai_service = AIService()
 processing_status = {}
 
 class ProcessingStatus(BaseModel):
-    chapter_id: str
+    lesson_id: str
     current_step: int
     total_steps: int
     step_name: str
@@ -50,10 +50,10 @@ class ProcessingStatus(BaseModel):
     is_completed: bool
     error: Optional[str] = None
 
-def update_processing_status(chapter_id: str, step: int, total_steps: int, step_name: str, step_description: str, is_completed: bool = False, error: str = None):
-    """Update the processing status for a chapter"""
-    processing_status[chapter_id] = ProcessingStatus(
-        chapter_id=chapter_id,
+def update_processing_status(lesson_id: str, step: int, total_steps: int, step_name: str, step_description: str, is_completed: bool = False, error: str = None):
+    """Update the processing status for a lesson"""
+    processing_status[lesson_id] = ProcessingStatus(
+        lesson_id=lesson_id,
         current_step=step,
         total_steps=total_steps,
         step_name=step_name,
@@ -66,15 +66,15 @@ def update_processing_status(chapter_id: str, step: int, total_steps: int, step_
 async def root():
     return {"message": "StudyEasy AI Backend is running"}
 
-@app.get("/api/processing-status/{chapter_id}")
-async def get_processing_status(chapter_id: str):
-    """Get the current processing status for a chapter"""
-    if chapter_id not in processing_status:
-        raise HTTPException(status_code=404, detail="Chapter processing status not found")
-    
-    status = processing_status[chapter_id]
+@app.get("/api/processing-status/{lesson_id}")
+async def get_processing_status(lesson_id: str):
+    """Get the current processing status for a lesson"""
+    if lesson_id not in processing_status:
+        raise HTTPException(status_code=404, detail="Lesson processing status not found")
+
+    status = processing_status[lesson_id]
     return {
-        "chapter_id": status.chapter_id,
+        "lesson_id": status.lesson_id,
         "current_step": status.current_step,
         "total_steps": status.total_steps,
         "step_name": status.step_name,
@@ -84,47 +84,47 @@ async def get_processing_status(chapter_id: str):
     }
 
 @app.post("/api/transcribe")
-async def transcribe_audio(file: UploadFile = File(...), chapter_id: str = None):
+async def transcribe_audio(file: UploadFile = File(...), lesson_id: str = None):
     """Transcribe audio file to text using ElevenLabs Speech-to-Text (auto language)."""
     try:
-        # If chapter_id provided, update status
-        if chapter_id:
+        # If lesson_id provided, update status
+        if lesson_id:
             update_processing_status(
-                chapter_id=chapter_id,
+                lesson_id=lesson_id,
                 step=1,
                 total_steps=6,
                 step_name="Transcription audio",
                 step_description="Conversion de l'audio en texte avec l'IA"
             )
-        
+
         # Save uploaded file temporarily
         temp_path = f"temp_{file.filename}"
         with open(temp_path, "wb") as buffer:
             content = await file.read()
             buffer.write(content)
-        
+
         # Transcribe audio (no modification to AI calls)
         transcription = await ai_service.transcribe_audio(temp_path)
-        
+
         # Clean up temp file
         os.remove(temp_path)
-        
-        # Update status if chapter_id provided
-        if chapter_id:
+
+        # Update status if lesson_id provided
+        if lesson_id:
             update_processing_status(
-                chapter_id=chapter_id,
+                lesson_id=lesson_id,
                 step=2,
                 total_steps=6,
                 step_name="Transcription terminée",
                 step_description="Conversion audio en texte réussie"
             )
-        
+
         return {"transcription": transcription}
-    
+
     except Exception as e:
-        if chapter_id:
+        if lesson_id:
             update_processing_status(
-                chapter_id=chapter_id,
+                lesson_id=lesson_id,
                 step=0,
                 total_steps=6,
                 step_name="Erreur transcription",
@@ -134,104 +134,104 @@ async def transcribe_audio(file: UploadFile = File(...), chapter_id: str = None)
         logger.error(f"Transcription error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/process-chapter")
-async def process_chapter(request: CourseGenerationRequest):
-    """Process text input to generate complete chapter content"""
-    # Generate a unique chapter_id for this processing session
+@app.post("/api/process-lesson")
+async def process_lesson(request: CourseGenerationRequest):
+    """Process text input to generate complete lesson content"""
+    # Generate a unique lesson_id for this processing session
     import uuid
-    chapter_id = str(uuid.uuid4())
-    
+    lesson_id = str(uuid.uuid4())
+
     try:
         # Initialize processing status
         update_processing_status(
-            chapter_id=chapter_id,
+            lesson_id=lesson_id,
             step=0,
             total_steps=6,
             step_name="Initialisation",
             step_description="Préparation du traitement du contenu"
         )
-        
+
         # Step 1: Starting processing
         update_processing_status(
-            chapter_id=chapter_id,
+            lesson_id=lesson_id,
             step=1,
             total_steps=6,
             step_name="Analyse du contenu",
             step_description="Analyse et préparation du texte d'entrée"
         )
-        
+
         # Step 2: Transcription (if needed)
         update_processing_status(
-            chapter_id=chapter_id,
+            lesson_id=lesson_id,
             step=2,
             total_steps=6,
             step_name="Transcription",
             step_description="Conversion de la parole en texte"
         )
-        
+
         # Step 3: Generate course content
         update_processing_status(
-            chapter_id=chapter_id,
+            lesson_id=lesson_id,
             step=3,
             total_steps=6,
             step_name="Génération du cours",
             step_description="Création du contenu structuré du cours"
         )
-        
-        # Step 4: Generate flashcards  
+
+        # Step 4: Generate flashcards
         update_processing_status(
-            chapter_id=chapter_id,
+            lesson_id=lesson_id,
             step=4,
             total_steps=6,
             step_name="Création des flashcards",
             step_description="Génération des cartes de révision"
         )
-        
+
         # Step 5: Generate quiz
         update_processing_status(
-            chapter_id=chapter_id,
+            lesson_id=lesson_id,
             step=5,
             total_steps=6,
             step_name="Génération du quiz",
             step_description="Création des questions d'évaluation"
         )
-        
-        # Process the input text to generate all chapter content
+
+        # Process the input text to generate all lesson content
         # (This calls the existing AI service without modifications)
-        processed_chapter = await ai_service.process_chapter(
+        processed_lesson = await ai_service.process_chapter(
             text=request.text,
-            chapter_name=request.chapter_name,
-            lesson_name=request.lesson_name,
+            chapter_name=request.lesson_name,  # Using lesson_name as chapter_name
+            lesson_name="",  # Not used anymore
             subject_name=request.subject_name
         )
-        
+
         # Final step: Completed
         update_processing_status(
-            chapter_id=chapter_id,
+            lesson_id=lesson_id,
             step=6,
             total_steps=6,
             step_name="Traitement terminé",
-            step_description="Génération complète du chapitre réussie",
+            step_description="Génération complète de la leçon réussie",
             is_completed=True
         )
-        
-        # Add chapter_id to response
-        result = processed_chapter
-        result["chapter_id"] = chapter_id
-        
+
+        # Add lesson_id to response
+        result = processed_lesson
+        result["lesson_id"] = lesson_id
+
         return result
-    
+
     except Exception as e:
         # Update status with error
         update_processing_status(
-            chapter_id=chapter_id,
+            lesson_id=lesson_id,
             step=0,
             total_steps=6,
             step_name="Erreur",
             step_description="Une erreur est survenue lors du traitement",
             error=str(e)
         )
-        logger.error(f"Chapter processing error: {str(e)}")
+        logger.error(f"Lesson processing error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/generate-course")

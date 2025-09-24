@@ -14,33 +14,33 @@ import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { useAuth } from '../contexts/AuthContext';
 import { DataService } from '../services/dataService';
-import { Chapter } from '../types';
+import { Lesson } from '../types';
 
 export const TranscriptionScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { user } = useAuth();
-  const { chapterId } = route.params as { chapterId: string };
+  const { lessonId } = route.params as { lessonId: string };
   
-  const [chapter, setChapter] = useState<Chapter | null>(null);
+  const [lesson, setLesson] = useState<Lesson | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || !chapterId) return;
+    if (!user || !lessonId) return;
 
-    const loadChapter = async () => {
+    const loadLesson = async () => {
       try {
-        const chapterData = await DataService.getChapter(chapterId);
-        setChapter(chapterData);
+        const lessonData = await DataService.getLesson(lessonId);
+        setLesson(lessonData);
         setIsLoading(false);
       } catch (error) {
-        console.error('Error loading chapter:', error);
+        console.error('Error loading lesson:', error);
         setIsLoading(false);
       }
     };
 
-    loadChapter();
-  }, [user, chapterId]);
+    loadLesson();
+  }, [user, lessonId]);
 
   if (isLoading) {
     return (
@@ -52,7 +52,7 @@ export const TranscriptionScreen: React.FC = () => {
     );
   }
 
-  if (!chapter || !chapter.transcription) {
+  if (!lesson || !lesson.transcription) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
@@ -86,15 +86,15 @@ export const TranscriptionScreen: React.FC = () => {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.chapterInfo}>
-          <Text style={styles.chapterName}>{chapter.name}</Text>
-          {chapter.duration > 0 && (
-            <Text style={styles.chapterDuration}>{chapter.duration} minutes</Text>
+        <View style={styles.lessonInfo}>
+          <Text style={styles.lessonName}>{lesson.name}</Text>
+          {lesson.duration > 0 && (
+            <Text style={styles.lessonDuration}>{lesson.duration} minutes</Text>
           )}
         </View>
 
         <View style={styles.transcriptionCard}>
-          <Text style={styles.transcriptionText}>{chapter.transcription}</Text>
+          <Text style={styles.transcriptionText}>{lesson.transcription}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -167,15 +167,15 @@ const styles = StyleSheet.create({
     color: Colors.surface,
     fontWeight: '600',
   },
-  chapterInfo: {
+  lessonInfo: {
     marginBottom: 24,
   },
-  chapterName: {
+  lessonName: {
     ...Typography.title2,
     color: Colors.text.primary,
     marginBottom: 8,
   },
-  chapterDuration: {
+  lessonDuration: {
     ...Typography.subheadline,
     color: Colors.text.secondary,
   },

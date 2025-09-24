@@ -1,109 +1,75 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Lesson } from '../types';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
-import { DoubleConfirmationModal } from './DoubleConfirmationModal';
 
 interface LessonCardProps {
   lesson: Lesson;
   onPress: () => void;
   onDelete?: () => void;
-  editMode?: boolean;
 }
 
-export const LessonCard: React.FC<LessonCardProps> = ({ lesson, onPress, onDelete, editMode = false }) => {
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  
-  const progress = (lesson.chaptersCount || 0) > 0 
-    ? ((lesson.completedChapters || 0) / (lesson.chaptersCount || 1)) * 100 
-    : 0;
+export const LessonCard: React.FC<LessonCardProps> = ({ lesson, onPress, onDelete }) => {
 
-  const handleDelete = () => {
-    setShowDeleteModal(false);
-    onDelete?.();
-  };
+  const progress = lesson.isCompleted ? 100 : (lesson.status === 'completed' ? 100 : 0);
 
   return (
-    <>
-      <TouchableOpacity
-        style={styles.container}
-        onPress={onPress}
-        activeOpacity={0.8}
-      >
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <Text style={styles.name}>{lesson.name}</Text>
-            <View style={styles.headerActions}>
-              {editMode && onDelete && (
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => setShowDeleteModal(true)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons 
-                    name="trash-outline" 
-                    size={18} 
-                    color={Colors.accent.red} 
-                  />
-                </TouchableOpacity>
-              )}
-              <Ionicons 
-                name="chevron-forward" 
-                size={20} 
-                color={Colors.text.tertiary} 
-              />
-            </View>
+    <TouchableOpacity
+      style={styles.container}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.name}>{lesson.name}</Text>
+          <View style={styles.headerActions}>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={Colors.text.tertiary}
+            />
           </View>
-        
+        </View>
+
         <View style={styles.info}>
           <View style={styles.infoItem}>
-            <Ionicons 
-              name="book-outline" 
-              size={16} 
-              color={Colors.text.secondary} 
+            <Ionicons
+              name="document-text-outline"
+              size={16}
+              color={Colors.text.secondary}
             />
             <Text style={styles.infoText}>
-              {lesson.completedChapters || 0}/{lesson.chaptersCount || 0} leçons
+              {lesson.status === 'completed' ? 'Terminée' : lesson.status === 'processing' ? 'En cours' : 'Brouillon'}
             </Text>
           </View>
-          
+
           <View style={styles.infoItem}>
-            <Ionicons 
-              name="time-outline" 
-              size={16} 
-              color={Colors.text.secondary} 
+            <Ionicons
+              name="time-outline"
+              size={16}
+              color={Colors.text.secondary}
             />
             <Text style={styles.infoText}>
               {lesson.duration || 0} min
             </Text>
           </View>
         </View>
-        
+
         <View style={styles.progressContainer}>
           <View style={styles.progressBackground}>
-            <View 
+            <View
               style={[
-                styles.progressBar, 
+                styles.progressBar,
                 { width: `${progress}%` }
-              ]} 
+              ]}
             />
           </View>
           <Text style={styles.progressText}>{Math.round(progress)}%</Text>
         </View>
       </View>
     </TouchableOpacity>
-
-    <DoubleConfirmationModal
-      visible={showDeleteModal}
-      title="Supprimer la leçon"
-      message={`Vous êtes sur le point de supprimer la leçon "${lesson.name}".`}
-      warningMessage="Cette action est irréversible ! Tous les chapitres associés seront également supprimés définitivement."
-      onConfirm={handleDelete}
-      onCancel={() => setShowDeleteModal(false)}
-    />
-  </>
   );
 };
 

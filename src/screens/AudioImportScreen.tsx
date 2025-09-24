@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,19 +21,20 @@ import { FileUploadService } from '../services/fileUploadService';
 import { DataService } from '../services/dataService';
 
 interface RouteParams {
-  lessonId: string;
-  chapterName?: string;
+  subjectId: string;
+  initialLessonName?: string;
 }
 
 export const AudioImportScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { user } = useAuth();
-  const { lessonId, chapterName } = route.params as RouteParams;
+  const { subjectId, initialLessonName } = route.params as RouteParams;
   
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+  const [lessonName, setLessonName] = useState<string>(initialLessonName || '');
 
   const handlePickAudio = async () => {
     try {
@@ -59,7 +61,15 @@ export const AudioImportScreen: React.FC = () => {
   };
 
   const handleUpload = async () => {
-    if (!selectedFile || !user) return;
+    if (!user) return;
+    if (!lessonName.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer un titre pour la leçon.');
+      return;
+    }
+    if (!selectedFile) {
+      Alert.alert('Erreur', 'Veuillez sélectionner un fichier audio.');
+      return;
+    }
     
     console.log('Selected file:', selectedFile);
     
@@ -72,16 +82,26 @@ export const AudioImportScreen: React.FC = () => {
     setIsUploading(true);
     
     try {
-      // 1. Create chapter first
-      const chapterId = await DataService.createChapter(user.uid, {
+      // 1. Create lesson only now (avoid saving before audio is provided)
+      const lessonId = await DataService.createLesson(user.uid, {
+        subjectId,
+        name: lessonName.trim(),
+        chaptersCount: 0,
+        completedChapters: 0,
+        duration: 0,
+        status: 'processing',
+      } as any);
+
+      // 2. Create chapter for this lesson and mark as processing
+      const chapterId = await (DataService as any).createChapter(user.uid, {
         lessonId,
-        name: chapterName || (selectedFile.name ? selectedFile.name.replace(/\.[^/.]+$/, "") : "Nouveau chapitre"),
+        name: selectedFile.name ? selectedFile.name.replace(/\.[^/.]+$/, "") : "Nouveau chapitre",
         isProcessing: true,
         isCompleted: false,
         duration: 0,
       });
 
-      // 2. Upload audio file using the new FileUploadService
+      // 3. Upload audio file using the new FileUploadService
       const storagePath = `audio/${user.uid}/${chapterId}/${Date.now()}.m4a`;
       
       let audioUrl: string;
@@ -102,10 +122,10 @@ export const AudioImportScreen: React.FC = () => {
         );
       }
 
-      // 3. Update chapter with audio URL
-      await DataService.updateChapter(chapterId, { audioUrl });
+      // 4. Update chapter with audio URL
+      await (DataService as any).updateChapter(chapterId, { audioUrl });
 
-      // 4. Navigate to processing screen for AI processing (include local file metadata)
+      // 5. Navigate to processing screen for AI processing (include local file metadata)
       navigation.navigate('ProcessingScreen' as never, {
         chapterId,
         audioUrl,
@@ -141,11 +161,22 @@ export const AudioImportScreen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.title}>Importer un audio</Text>
+        <Text style={styles.title}>Nouvelle leçon</Text>
         <View style={styles.placeholder} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Titre de la leçon *</Text>
+          <TextInput
+            style={styles.textInput}
+            value={lessonName}
+            onChangeText={setLessonName}
+            placeholder="Ex: Cours de biologie cellulaire"
+            placeholderTextColor={Colors.text.tertiary}
+          />
+        </View>
+
         <View style={styles.instructionCard}>
           <View style={styles.instructionIcon}>
             <Ionicons name="information-circle" size={24} color={Colors.accent.blue} />
@@ -220,9 +251,12 @@ export const AudioImportScreen: React.FC = () => {
 
         {selectedFile && (
           <TouchableOpacity 
-            style={[styles.uploadButton, isUploading && styles.uploadButtonDisabled]}
+            style={[
+              styles.uploadButton,
+              (isUploading || !lessonName.trim()) && styles.uploadButtonDisabled
+            ]}
             onPress={handleUpload}
-            disabled={isUploading}
+            disabled={isUploading || !lessonName.trim()}
           >
             {isUploading ? (
               <>
@@ -273,6 +307,24 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 24,
+  },
+  inputGroup: {
+    marginBottom: 24,
+  },
+  inputLabel: {
+    ...Typography.subheadline,
+    color: Colors.text.primary,
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  textInput: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    ...Typography.body,
+    color: Colors.text.primary,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
   },
   instructionCard: {
     flexDirection: 'row',

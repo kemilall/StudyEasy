@@ -14,15 +14,15 @@ import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { useAuth } from '../contexts/AuthContext';
 import { DataService } from '../services/dataService';
-import { Chapter, QuizQuestion } from '../types';
+import { Lesson, QuizQuestion } from '../types';
 
 export const QuizScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { user } = useAuth();
-  const { chapterId } = route.params as { chapterId: string };
+  const { lessonId } = route.params as { lessonId: string };
   
-  const [chapter, setChapter] = useState<Chapter | null>(null);
+  const [lesson, setLesson] = useState<Lesson | null>(null);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<number[]>([]);
@@ -31,25 +31,25 @@ export const QuizScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || !chapterId) return;
+    if (!user || !lessonId) return;
 
-    const loadChapter = async () => {
+    const loadLesson = async () => {
       try {
-        const chapterData = await DataService.getChapter(chapterId);
-        setChapter(chapterData);
-        if (chapterData?.quiz) {
-          setQuestions(chapterData.quiz);
-          setSelectedAnswers(new Array(chapterData.quiz.length).fill(-1));
+        const lessonData = await DataService.getLesson(lessonId);
+        setLesson(lessonData);
+        if (lessonData?.quiz) {
+          setQuestions(lessonData.quiz);
+          setSelectedAnswers(new Array(lessonData.quiz.length).fill(-1));
         }
         setIsLoading(false);
       } catch (error) {
-        console.error('Error loading chapter:', error);
+        console.error('Error loading lesson:', error);
         setIsLoading(false);
       }
     };
 
-    loadChapter();
-  }, [user, chapterId]);
+    loadLesson();
+  }, [user, lessonId]);
 
   const selectAnswer = (answerIndex: number) => {
     if (showResult) return;

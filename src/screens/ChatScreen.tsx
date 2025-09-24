@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { RootStackParamList } from '../navigation/types';
-import { ChatMessage, Chapter } from '../types';
+import { ChatMessage, Lesson } from '../types';
 import { AIService } from '../services/aiService';
 import { DataService } from '../services/dataService';
 
@@ -26,37 +26,37 @@ type ChatScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Chat'>;
 export const ChatScreen: React.FC = () => {
   const navigation = useNavigation<ChatScreenNavigationProp>();
   const route = useRoute<ChatScreenRouteProp>();
-  const { chapterId } = route.params;
-  
+  const { lessonId } = route.params;
+
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [chapter, setChapter] = useState<Chapter | null>(null);
+  const [lesson, setLesson] = useState<Lesson | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
       role: 'assistant',
-      content: 'Bonjour! Je suis votre assistant IA pour ce chapitre. N\'hésitez pas à me poser des questions sur le cours.',
+      content: 'Bonjour! Je suis votre assistant IA pour cette leçon. N\'hésitez pas à me poser des questions sur le cours.',
       timestamp: new Date(),
     },
   ]);
   const flatListRef = useRef<FlatList>(null);
 
-  // Load chapter data on mount
+  // Load lesson data on mount
   React.useEffect(() => {
-    const loadChapter = async () => {
+    const loadLesson = async () => {
       try {
-        const chapterData = await DataService.getChapter(chapterId);
-        setChapter(chapterData);
+        const lessonData = await DataService.getLesson(lessonId);
+        setLesson(lessonData);
       } catch (error) {
-        console.error('Error loading chapter:', error);
+        console.error('Error loading lesson:', error);
       }
     };
-    
-    loadChapter();
-  }, [chapterId]);
+
+    loadLesson();
+  }, [lessonId]);
 
   const handleSend = async () => {
-    if (inputText.trim() === '' || !chapter || isLoading) return;
+    if (inputText.trim() === '' || !lesson || isLoading) return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -70,12 +70,12 @@ export const ChatScreen: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Prepare context from chapter
-      const context = `
-Chapitre: ${chapter.name}
-${chapter.transcription ? `Transcription: ${chapter.transcription}` : ''}
-${chapter.summary ? `Résumé: ${chapter.summary}` : ''}
-${chapter.keyPoints ? `Points clés: ${chapter.keyPoints.join(', ')}` : ''}
+      // Prepare context from lesson
+        const context = `
+Leçon: ${lesson.name}
+${lesson.transcription ? `Transcription: ${lesson.transcription}` : ''}
+${lesson.summary ? `Résumé: ${lesson.summary}` : ''}
+${lesson.keyPoints ? `Points clés: ${lesson.keyPoints.join(', ')}` : ''}
       `.trim();
 
       // Prepare chat history
