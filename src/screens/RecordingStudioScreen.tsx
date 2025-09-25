@@ -181,33 +181,40 @@ export const RecordingStudioScreen: React.FC = () => {
 
   const startNewSegment = async () => {
     try {
-      // Stop any playback in progress
-      if (sound) {
+      // Feedback visuel immédiat
+      setIsRecording(true);
+      setIsPaused(false);
+      setCurrentSegmentDuration(0);
+
+      // Stop any playback in progress (en parallèle)
+      const stopPlaybackPromise = sound ? (async () => {
         await sound.stopAsync();
         await sound.unloadAsync();
         setSound(null);
         setIsPlaying(false);
         setPlaybackPosition(0);
         setCurrentPlayingSegmentIndex(0);
-      }
-      
-      // Always configure audio mode for recording first
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-      });
-      
-      // Create lesson if needed
-      if (!lessonId && user) {
-        const newLessonId = await DataService.createLesson(user.uid, {
+      })() : Promise.resolve();
+
+      // Create lesson if needed (en parallèle)
+      const createLessonPromise = (!lessonId && user) ? 
+        DataService.createLesson(user.uid, {
           subjectId,
           name: lessonNameRef.current,
           status: 'draft',
           duration: 0,
-        });
-        setLessonId(newLessonId);
-      }
+        }).then(newLessonId => setLessonId(newLessonId)) : 
+        Promise.resolve();
+
+      // Configure audio mode (en parallèle)
+      const audioConfigPromise = Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+      });
+
+      // Attendre les tâches en parallèle
+      await Promise.all([stopPlaybackPromise, createLessonPromise, audioConfigPromise]);
 
       const recordingOptions: Audio.RecordingOptions = {
         android: {
@@ -241,9 +248,6 @@ export const RecordingStudioScreen: React.FC = () => {
 
       setRecording(newRecording);
       recordingRef.current = newRecording;
-      setIsRecording(true);
-      setIsPaused(false);
-      setCurrentSegmentDuration(0);
 
       // Start duration tracking
       durationInterval.current = setInterval(() => {
@@ -260,6 +264,9 @@ export const RecordingStudioScreen: React.FC = () => {
 
     } catch (error) {
       console.error('Failed to start recording:', error);
+      // Remettre l'état si erreur
+      setIsRecording(false);
+      setIsPaused(false);
       Alert.alert('Erreur', "Impossible de démarrer l'enregistrement. Vérifiez les permissions microphone.");
     }
   };
@@ -668,17 +675,9 @@ export const RecordingStudioScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Record Button Label */}
-      <Text style={styles.recordLabel}>
-        {isRecording 
-          ? 'Mettre en pause' 
-          : hasAnyRecording 
-            ? 'Reprendre' 
-            : 'Enregistrer'}
-      </Text>
 
       {/* Validate Button */}
-      {hasAnyRecording && !isRecording && (
+      {hasAnyRecording && !isRecording && !isPlaying && (
         <TouchableOpacity
           style={styles.validateButton}
           onPress={processRecording}
@@ -766,12 +765,6 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.4,
     backgroundColor: '#E5E5E7',
-  },
-  recordLabel: {
-    ...Typography.h3,
-    color: Colors.text.secondary,
-    textAlign: 'center',
-    marginBottom: 40,
   },
   validateButton: {
     flexDirection: 'row',
