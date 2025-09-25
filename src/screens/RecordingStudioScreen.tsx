@@ -7,7 +7,9 @@ import {
   Alert,
   AppState,
   AppStateStatus,
+  Dimensions,
 } from 'react-native';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +34,7 @@ interface RouteParams {
 
 const AUTOSAVE_INTERVAL = 5000; // Save draft metadata every 5 seconds
 const getRecordingsDir = () => `${FileSystem.documentDirectory}recordings/`;
+const { width: screenWidth } = Dimensions.get('window');
 
 export const RecordingStudioScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -62,12 +65,19 @@ export const RecordingStudioScreen: React.FC = () => {
   const [playbackPosition, setPlaybackPosition] = useState(0);
   const [playbackDuration, setPlaybackDuration] = useState(0);
   const [currentPlayingSegmentIndex, setCurrentPlayingSegmentIndex] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   
+  // Refs
   const appState = useRef(AppState.currentState);
   const durationInterval = useRef<NodeJS.Timeout | null>(null);
   const autoSaveInterval = useRef<NodeJS.Timeout | null>(null);
   const lessonNameRef = useRef(initialLessonName || 'Enregistrement');
   const recordingRef = useRef<Audio.Recording | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const playbackStatusRef = useRef<any>(null);
+  const wasPlayingBeforeDrag = useRef<boolean>(false);
+  const lastDragPositionRef = useRef<number>(0);
+  const isDraggingRef = useRef<boolean>(false);
 
   useEffect(() => {
     setupAudio();
@@ -82,8 +92,8 @@ export const RecordingStudioScreen: React.FC = () => {
       if (recording) {
         handleStopSegment(false);
       }
-      if (sound) {
-        sound.unloadAsync();
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
       }
       if (durationInterval.current) {
         clearInterval(durationInterval.current);
@@ -187,9 +197,10 @@ export const RecordingStudioScreen: React.FC = () => {
       setCurrentSegmentDuration(0);
 
       // Stop any playback in progress (en parallèle)
-      const stopPlaybackPromise = sound ? (async () => {
-        await sound.stopAsync();
-        await sound.unloadAsync();
+      const stopPlaybackPromise = soundRef.current ? (async () => {
+        await soundRef.current!.stopAsync();
+        await soundRef.current!.unloadAsync();
+        soundRef.current = null;
         setSound(null);
         setIsPlaying(false);
         setPlaybackPosition(0);
@@ -496,18 +507,32 @@ export const RecordingStudioScreen: React.FC = () => {
 
   const playAllSegments = async () => {
     if (segments.length === 0) return;
-    
-    // Reset audio mode for playback
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: false,
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: true,
-      shouldDuckAndroid: true,
-      playThroughEarpieceAndroid: false,
-    });
-    
-    setCurrentPlayingSegmentIndex(0);
-    playSegment(0);
+
+    try {
+      // Configure audio for playback
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+
+      setIsPlaying(true);
+
+      // If we have a valid position, resume from there
+      if (playbackPosition > 0 && playbackPosition < totalDurationMillis) {
+        await seekToPosition(playbackPosition, true);
+      } else {
+        // Otherwise start from beginning
+        setPlaybackPosition(0);
+        setCurrentPlayingSegmentIndex(0);
+        await playSegment(0);
+      }
+    } catch (error) {
+      console.error('Error starting playback:', error);
+      setIsPlaying(false);
+    }
   };
 
   const playSegment = async (index: number) => {
@@ -515,8 +540,17 @@ export const RecordingStudioScreen: React.FC = () => {
       const validSegments = segments.filter(seg => seg.durationMillis > 100);
       if (index >= validSegments.length) {
         // All segments played
+        console.log('All segments played');
         setIsPlaying(false);
+        setPlaybackPosition(0);
         setCurrentPlayingSegmentIndex(0);
+        
+        // Clean up current sound
+        if (soundRef.current) {
+          await soundRef.current.unloadAsync();
+          soundRef.current = null;
+          setSound(null);
+        }
         
         // Reset audio mode for recording
         await Audio.setAudioModeAsync({
@@ -528,27 +562,32 @@ export const RecordingStudioScreen: React.FC = () => {
       }
 
       const segment = validSegments[index];
+      console.log(`Playing segment ${index}:`, segment.uri);
       
-      // Set audio mode for playback
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-      });
-
-      // Check if file exists and is valid before playing
+      // Check if file exists and is valid
       const fileInfo = await FileSystem.getInfoAsync(segment.uri);
       if (!fileInfo.exists || (fileInfo.size && fileInfo.size < 1000)) {
         console.log('Skipping invalid segment:', segment.uri);
-        playSegment(index + 1);
+        await playSegment(index + 1);
         return;
       }
 
-      // Add a small delay to ensure audio context is ready
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Clean up previous sound if exists
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+        setSound(null);
+      }
 
+      // Calculate accumulated duration for this segment
+      let accumulatedDuration = 0;
+      for (let i = 0; i < index; i++) {
+        if (validSegments[i]) {
+          accumulatedDuration += validSegments[i].durationMillis;
+        }
+      }
+
+      // Create and play new sound
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: segment.uri },
         { 
@@ -558,39 +597,57 @@ export const RecordingStudioScreen: React.FC = () => {
         },
         (status) => {
           if (status.isLoaded) {
-            setPlaybackPosition(status.positionMillis || 0);
-            setPlaybackDuration(totalDurationMillis); // Utilise la durée totale pour l'expérience continue
-            if (status.didJustFinish) {
-              // Play next segment automatiquement
-              playSegment(index + 1);
+            playbackStatusRef.current = status;
+
+            // Always update position if playing, regardless of dragging state
+            if (status.isPlaying) {
+              const globalPosition = accumulatedDuration + (status.positionMillis || 0);
+              setPlaybackPosition(globalPosition);
+              setPlaybackDuration(totalDurationMillis);
+            }
+
+            if (status.didJustFinish && !isDraggingRef.current) {
+              console.log(`Segment ${index} finished, playing next`);
+              // Play next segment
+              setTimeout(() => {
+                playSegment(index + 1);
+              }, 100);
             }
           }
         }
       );
 
+      soundRef.current = newSound;
       setSound(newSound);
-      setIsPlaying(true);
       setCurrentPlayingSegmentIndex(index);
 
     } catch (error) {
-      console.error('Error playing recording:', error);
+      console.error('Error playing segment:', error);
       Alert.alert('Erreur', 'Impossible de lire l\'enregistrement');
       setIsPlaying(false);
     }
   };
 
   const pausePlayback = async () => {
-    if (sound) {
-      await sound.pauseAsync();
-      setIsPlaying(false);
+    if (soundRef.current) {
+      try {
+        await soundRef.current.pauseAsync();
+        setIsPlaying(false);
+      } catch (error) {
+        console.error('Error pausing playback:', error);
+      }
     }
   };
 
   const stopPlayback = async () => {
-    if (sound) {
-      await sound.stopAsync();
-      await sound.unloadAsync();
-      setSound(null);
+    try {
+      if (soundRef.current) {
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+        setSound(null);
+      }
+      
       setIsPlaying(false);
       setPlaybackPosition(0);
       setCurrentPlayingSegmentIndex(0);
@@ -601,6 +658,159 @@ export const RecordingStudioScreen: React.FC = () => {
         playsInSilentModeIOS: true,
         staysActiveInBackground: true,
       });
+    } catch (error) {
+      console.error('Error stopping playback:', error);
+    }
+  };
+
+  const handlePlayPauseToggle = async () => {
+    if (isPlaying) {
+      await pausePlayback();
+    } else {
+      await playAllSegments();
+    }
+  };
+
+  const seekToPosition = async (position: number, resumePlayback: boolean = false) => {
+    if (!totalDurationMillis || segments.length === 0) return;
+
+    try {
+      const targetPositionMillis = Math.max(0, Math.min(position, totalDurationMillis));
+      const shouldPlay = resumePlayback || isPlaying;
+
+      console.log('Seeking to position:', targetPositionMillis, 'shouldPlay:', shouldPlay);
+
+      // Find which segment contains this position
+      let accumulatedDuration = 0;
+      let targetSegmentIndex = 0;
+      let positionInSegment = 0;
+
+      const validSegments = segments.filter(seg => seg.durationMillis > 100);
+
+      for (let i = 0; i < validSegments.length; i++) {
+        const segment = validSegments[i];
+        if (targetPositionMillis <= accumulatedDuration + segment.durationMillis) {
+          targetSegmentIndex = i;
+          positionInSegment = targetPositionMillis - accumulatedDuration;
+          break;
+        }
+        accumulatedDuration += segment.durationMillis;
+      }
+
+      // Stop current playback if exists
+      if (soundRef.current) {
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+        setSound(null);
+      }
+
+      // Update position immediately for UI feedback
+      setPlaybackPosition(targetPositionMillis);
+      setCurrentPlayingSegmentIndex(targetSegmentIndex);
+
+      // Create the sound at the target position
+      if (validSegments[targetSegmentIndex]) {
+        const segmentAccumulatedDuration = accumulatedDuration;
+        
+        const { sound: newSound } = await Audio.Sound.createAsync(
+          { uri: validSegments[targetSegmentIndex].uri },
+          {
+            shouldPlay: shouldPlay,
+            isLooping: false,
+            volume: 1.0,
+            positionMillis: positionInSegment,
+          },
+          (status) => {
+            if (status.isLoaded) {
+              playbackStatusRef.current = status;
+
+              // Always update position if playing, regardless of dragging state after seek
+              if (status.isPlaying) {
+                const globalPosition = segmentAccumulatedDuration + (status.positionMillis || 0);
+                setPlaybackPosition(globalPosition);
+                setPlaybackDuration(totalDurationMillis);
+              }
+
+              if (status.didJustFinish && !isDraggingRef.current) {
+                console.log(`Segment ${targetSegmentIndex} finished after seek, playing next`);
+                setTimeout(() => {
+                  playSegment(targetSegmentIndex + 1);
+                }, 100);
+              }
+            }
+          }
+        );
+
+        soundRef.current = newSound;
+        setSound(newSound);
+        setIsPlaying(shouldPlay);
+      }
+    } catch (error) {
+      console.error('Error seeking:', error);
+      setIsPlaying(false);
+    }
+  };
+
+  const handleProgressPanGesture = (event: any) => {
+    if (!hasAnyRecording || isRecording) return;
+
+    const { x } = event.nativeEvent;
+    const progressBarWidth = screenWidth - 144;
+    const progress = Math.max(0, Math.min(1, x / progressBarWidth));
+    const targetPosition = progress * totalDurationMillis;
+
+    // Update position visually during drag and store last position
+    lastDragPositionRef.current = targetPosition;
+    setPlaybackPosition(targetPosition);
+    console.log(`DRAG ACTIVE - Updating position to: ${targetPosition}`);
+  };
+
+  const handleProgressPanStateChange = (event: any) => {
+    if (!hasAnyRecording || isRecording) return;
+
+    const { state, x } = event.nativeEvent;
+
+    // Ignore duplicate events
+    if (state === State.BEGAN && isDraggingRef.current) {
+      console.log('Ignoring duplicate BEGAN event');
+      return;
+    }
+
+    const progressBarWidth = screenWidth - 144;
+    const progress = Math.max(0, Math.min(1, (x ?? 0) / progressBarWidth));
+    const targetPosition = progress * totalDurationMillis;
+
+    console.log(`Progress Pan State Change - State: ${State[state]}, x: ${x}, computedPos: ${targetPosition}, isDragging: ${isDraggingRef.current}`);
+
+    if (state === State.BEGAN && !isDraggingRef.current) {
+      console.log('DRAG BEGAN - set isDragging true and pause if needed');
+      setIsDragging(true);
+      isDraggingRef.current = true;
+      wasPlayingBeforeDrag.current = isPlaying;
+      lastDragPositionRef.current = playbackPosition; // init
+      if (soundRef.current && isPlaying) {
+        soundRef.current.setStatusAsync({ shouldPlay: false }).then(() => {
+          console.log('Playback paused for drag');
+          setIsPlaying(false);
+        }).catch(err => console.error('Error pausing for drag:', err));
+      }
+    } else if ((state === State.END || state === State.CANCELLED || state === State.FAILED) && isDraggingRef.current) {
+      const finalPosition = lastDragPositionRef.current || targetPosition || playbackPosition;
+      console.log(`DRAG END - finalPosition: ${finalPosition}, clearing drag state first`);
+
+      // CRITICAL: Clear dragging state immediately
+      isDraggingRef.current = false;
+      setIsDragging(false);
+
+      // Update position and resume
+      setPlaybackPosition(finalPosition);
+
+      // Resume playback immediately
+      console.log('Resuming playback after drag');
+      seekToPosition(finalPosition, wasPlayingBeforeDrag.current);
+
+      wasPlayingBeforeDrag.current = false;
     }
   };
 
@@ -635,28 +845,62 @@ export const RecordingStudioScreen: React.FC = () => {
       {/* Timer */}
       <View style={styles.timerContainer}>
         <Text style={styles.timer}>{formatDuration(totalDurationMillis)}</Text>
+        
+        {/* Audio Progress Bar - only when not recording and has audio */}
+        {hasAnyRecording && !isRecording && (
+          <View style={styles.audioPlayerContainer}>
+            <TouchableOpacity
+              style={styles.playPauseButton}
+              onPress={handlePlayPauseToggle}
+              activeOpacity={0.7}
+            >
+              <Ionicons 
+                name={isPlaying ? "pause" : "play"} 
+                size={20} 
+                color={Colors.text.primary} 
+              />
+            </TouchableOpacity>
+            
+            <Text style={styles.currentTime}>
+              {formatDuration(playbackPosition)}
+            </Text>
+            
+            <PanGestureHandler 
+              onGestureEvent={handleProgressPanGesture}
+              onHandlerStateChange={handleProgressPanStateChange}
+            >
+              <View style={styles.progressBarContainer}>
+                <View style={styles.progressBarBackground}>
+                  <View 
+                    style={[
+                      styles.progressBarFill,
+                      { 
+                        width: `${totalDurationMillis > 0 ? (playbackPosition / totalDurationMillis) * 100 : 0}%` 
+                      }
+                    ]} 
+                  />
+                  <View 
+                    style={[
+                      styles.progressThumb,
+                      { 
+                        left: `${totalDurationMillis > 0 ? (playbackPosition / totalDurationMillis) * 100 : 0}%` 
+                      }
+                    ]} 
+                  />
+                </View>
+              </View>
+            </PanGestureHandler>
+            
+            <Text style={styles.totalTime}>
+              {formatDuration(totalDurationMillis)}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Controls */}
       <View style={styles.controlsContainer}>
-        {/* Play Button */}
-        <TouchableOpacity
-          style={[
-            styles.playButton,
-            (!hasAnyRecording || isRecording) && styles.disabledButton
-          ]}
-          onPress={isPlaying ? stopPlayback : playAllSegments}
-          disabled={!hasAnyRecording || isRecording}
-          activeOpacity={0.8}
-        >
-          <Ionicons 
-            name={isPlaying ? "stop" : "play"} 
-            size={24} 
-            color={(!hasAnyRecording || isRecording) ? '#9CA3AF' : Colors.surface} 
-          />
-        </TouchableOpacity>
-
-        {/* Record Button */}
+        {/* Record Button - Centered */}
         <TouchableOpacity
           style={[
             styles.recordButton,
@@ -725,25 +969,10 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   controlsContainer: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 40,
-    gap: 40,
     marginBottom: 20,
-  },
-  playButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#6B7280',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 2,
   },
   recordButton: {
     width: 80,
@@ -786,5 +1015,64 @@ const styles = StyleSheet.create({
   validateButtonText: {
     ...Typography.h3,
     color: Colors.surface,
+  },
+  audioPlayerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  playPauseButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+  },
+  currentTime: {
+    ...Typography.caption,
+    color: Colors.text.secondary,
+    fontVariant: ['tabular-nums'],
+    minWidth: 40,
+    textAlign: 'right',
+  },
+  totalTime: {
+    ...Typography.caption,
+    color: Colors.text.secondary,
+    fontVariant: ['tabular-nums'],
+    minWidth: 40,
+    textAlign: 'left',
+  },
+  progressBarContainer: {
+    flex: 1,
+    height: 44,
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  progressBarBackground: {
+    height: 4,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 2,
+    position: 'relative',
+  },
+  progressBarFill: {
+    height: 4,
+    backgroundColor: Colors.accent.blue,
+    borderRadius: 2,
+  },
+  progressThumb: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: Colors.accent.blue,
+    top: -6,
+    marginLeft: -8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
 });
