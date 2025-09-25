@@ -8,6 +8,15 @@ export type RootStackParamList = {
   Quiz: { lessonId: string };
   Chat: { lessonId: string };
   AudioImport: { subjectId: string; initialLessonName?: string } | undefined;
+  RecordingSubjectPicker: { initialLessonName?: string } | undefined;
+  RecordingStudio: {
+    subjectId: string;
+    subjectName: string;
+    subjectColor?: string;
+    lessonId?: string;
+    draftId?: string;
+    initialLessonName?: string;
+  };
   CreateSubject: undefined;
   CreateLesson: { subjectId?: string };
   ProcessingScreen: {

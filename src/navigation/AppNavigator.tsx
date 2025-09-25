@@ -18,6 +18,8 @@ import { AudioImportScreen } from '../screens/AudioImportScreen';
 import { CreateSubjectScreen } from '../screens/CreateSubjectScreen';
 import { CreateLessonScreen } from '../screens/CreateLessonScreen';
 import { ProcessingScreen } from '../screens/ProcessingScreen';
+import { RecordingSubjectPickerScreen } from '../screens/RecordingSubjectPickerScreen';
+import { RecordingStudioScreen } from '../screens/RecordingStudioScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { SignUpScreen } from '../screens/SignUpScreen';
 import { useAuth } from '../contexts/AuthContext';
@@ -160,6 +162,20 @@ const AppStack = () => {
       <Stack.Screen 
         name="AudioImport" 
         component={AudioImportScreen}
+        options={{
+          presentation: 'modal',
+        }}
+      />
+      <Stack.Screen
+        name="RecordingSubjectPicker"
+        component={RecordingSubjectPickerScreen}
+        options={{
+          presentation: 'modal',
+        }}
+      />
+      <Stack.Screen
+        name="RecordingStudio"
+        component={RecordingStudioScreen}
         options={{
           presentation: 'modal',
         }}

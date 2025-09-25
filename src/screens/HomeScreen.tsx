@@ -198,7 +198,7 @@ export const HomeScreen: React.FC = () => {
           <TouchableOpacity 
             style={styles.actionButton}
             activeOpacity={0.7}
-            onPress={() => navigation.navigate('Subjects', { screen: 'SubjectsList' })}
+            onPress={() => navigation.navigate('RecordingSubjectPicker' as never)}
           >
             <View style={styles.actionIconContainer}>
               <Ionicons name="mic" size={24} color={Colors.accent.red} />

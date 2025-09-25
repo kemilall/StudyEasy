@@ -188,7 +188,11 @@ export const SubjectScreen: React.FC = () => {
             <View style={styles.headerActions}>
               <TouchableOpacity
                 style={styles.addButton}
-                onPress={() => (navigation as any).navigate('AudioImport', { subjectId })}
+                onPress={() => (navigation as any).navigate('RecordingStudio', {
+                  subjectId,
+                  subjectName: subject?.name || 'Matière',
+                  subjectColor: subject?.color,
+                })}
               >
                 <Ionicons name="add-circle" size={20} color={Colors.accent.blue} />
                 <Text style={styles.addButtonText}>Nouvelle</Text>
@@ -205,7 +209,11 @@ export const SubjectScreen: React.FC = () => {
               </Text>
               <TouchableOpacity
                 style={styles.createButton}
-                onPress={() => (navigation as any).navigate('AudioImport', { subjectId })}
+                onPress={() => (navigation as any).navigate('RecordingStudio', {
+                  subjectId,
+                  subjectName: subject?.name || 'Matière',
+                  subjectColor: subject?.color,
+                })}
               >
                 <Text style={styles.createButtonText}>Créer une leçon</Text>
               </TouchableOpacity>

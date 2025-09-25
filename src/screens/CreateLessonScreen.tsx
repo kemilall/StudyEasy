@@ -65,7 +65,12 @@ export const CreateLessonScreen: React.FC = () => {
     }
 
     // Do not save here; go to AudioImport to collect audio and process
-    navigation.navigate('AudioImport' as never, { subjectId: subjectIdToUse, initialLessonName: lessonName.trim() } as never);
+    navigation.navigate('RecordingStudio' as never, {
+      subjectId: subjectIdToUse,
+      subjectName: selectedSubject?.name || 'Matière',
+      subjectColor: selectedSubject?.color,
+      initialLessonName: lessonName.trim(),
+    } as never);
   };
 
   const renderSubjectItem = ({ item }: { item: Subject }) => (
