@@ -78,6 +78,8 @@ export const RecordingStudioScreen: React.FC = () => {
   const wasPlayingBeforeDrag = useRef<boolean>(false);
   const lastDragPositionRef = useRef<number>(0);
   const isDraggingRef = useRef<boolean>(false);
+  const lastDragEndTime = useRef<number>(0);
+  const DRAG_COOLDOWN_MS = 100; // Minimum time between drag operations
 
   useEffect(() => {
     setupAudio();
@@ -508,6 +510,12 @@ export const RecordingStudioScreen: React.FC = () => {
   const playAllSegments = async () => {
     if (segments.length === 0) return;
 
+    // Prevent multiple simultaneous play operations
+    if (isPlaying) {
+      console.log('Already playing, ignoring play request');
+      return;
+    }
+
     try {
       // Configure audio for playback
       await Audio.setAudioModeAsync({
@@ -522,9 +530,11 @@ export const RecordingStudioScreen: React.FC = () => {
 
       // If we have a valid position, resume from there
       if (playbackPosition > 0 && playbackPosition < totalDurationMillis) {
+        console.log('Resuming from position:', playbackPosition);
         await seekToPosition(playbackPosition, true);
       } else {
         // Otherwise start from beginning
+        console.log('Starting from beginning');
         setPlaybackPosition(0);
         setCurrentPlayingSegmentIndex(0);
         await playSegment(0);
@@ -537,6 +547,12 @@ export const RecordingStudioScreen: React.FC = () => {
 
   const playSegment = async (index: number) => {
     try {
+      // Don't play if we're currently dragging
+      if (isDraggingRef.current) {
+        console.log('Not playing segment - currently dragging');
+        return;
+      }
+
       const validSegments = segments.filter(seg => seg.durationMillis > 100);
       if (index >= validSegments.length) {
         // All segments played
@@ -544,14 +560,14 @@ export const RecordingStudioScreen: React.FC = () => {
         setIsPlaying(false);
         setPlaybackPosition(0);
         setCurrentPlayingSegmentIndex(0);
-        
+
         // Clean up current sound
         if (soundRef.current) {
           await soundRef.current.unloadAsync();
           soundRef.current = null;
           setSound(null);
         }
-        
+
         // Reset audio mode for recording
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: true,
@@ -667,6 +683,9 @@ export const RecordingStudioScreen: React.FC = () => {
     if (isPlaying) {
       await pausePlayback();
     } else {
+      // Clear dragging state when user explicitly presses play
+      isDraggingRef.current = false;
+      setIsDragging(false);
       await playAllSegments();
     }
   };
@@ -674,11 +693,18 @@ export const RecordingStudioScreen: React.FC = () => {
   const seekToPosition = async (position: number, resumePlayback: boolean = false) => {
     if (!totalDurationMillis || segments.length === 0) return;
 
+    // Prevent multiple simultaneous seeking operations
+    if (isDraggingRef.current) {
+      console.log('Skipping seek - currently dragging');
+      return;
+    }
+
     try {
       const targetPositionMillis = Math.max(0, Math.min(position, totalDurationMillis));
-      const shouldPlay = resumePlayback || isPlaying;
+      // Only play if explicitly requested, never fallback to isPlaying state
+      const shouldPlay = resumePlayback && !isDraggingRef.current;
 
-      console.log('Seeking to position:', targetPositionMillis, 'shouldPlay:', shouldPlay);
+      console.log('Seeking to position:', targetPositionMillis, 'shouldPlay:', shouldPlay, 'isDragging:', isDraggingRef.current);
 
       // Find which segment contains this position
       let accumulatedDuration = 0;
@@ -725,13 +751,14 @@ export const RecordingStudioScreen: React.FC = () => {
             if (status.isLoaded) {
               playbackStatusRef.current = status;
 
-              // Always update position if playing, regardless of dragging state after seek
-              if (status.isPlaying) {
+              // Only update position if actually playing and not dragging
+              if (status.isPlaying && !isDraggingRef.current) {
                 const globalPosition = segmentAccumulatedDuration + (status.positionMillis || 0);
                 setPlaybackPosition(globalPosition);
                 setPlaybackDuration(totalDurationMillis);
               }
 
+              // Only auto-advance if not dragging
               if (status.didJustFinish && !isDraggingRef.current) {
                 console.log(`Segment ${targetSegmentIndex} finished after seek, playing next`);
                 setTimeout(() => {
@@ -784,17 +811,37 @@ export const RecordingStudioScreen: React.FC = () => {
     console.log(`Progress Pan State Change - State: ${State[state]}, x: ${x}, computedPos: ${targetPosition}, isDragging: ${isDraggingRef.current}`);
 
     if (state === State.BEGAN && !isDraggingRef.current) {
-      console.log('DRAG BEGAN - set isDragging true and pause if needed');
+      const now = Date.now();
+      // Prevent new drags too soon after the last one ended
+      if (now - lastDragEndTime.current < DRAG_COOLDOWN_MS) {
+        console.log('Ignoring BEGAN - too soon after last drag end');
+        return;
+      }
+
+      console.log('DRAG BEGAN - set isDragging true and pause immediately');
       setIsDragging(true);
       isDraggingRef.current = true;
       wasPlayingBeforeDrag.current = isPlaying;
       lastDragPositionRef.current = playbackPosition; // init
-      if (soundRef.current && isPlaying) {
+
+      // Immediately stop playback when drag starts
+      if (soundRef.current) {
         soundRef.current.setStatusAsync({ shouldPlay: false }).then(() => {
           console.log('Playback paused for drag');
           setIsPlaying(false);
+          // Also stop and unload to ensure complete stop
+          soundRef.current!.stopAsync().then(() => {
+            soundRef.current!.unloadAsync().then(() => {
+              soundRef.current = null;
+              setSound(null);
+              console.log('Sound fully unloaded during drag start');
+            });
+          });
         }).catch(err => console.error('Error pausing for drag:', err));
       }
+    } else if (state === State.BEGAN && isDraggingRef.current) {
+      console.log('Ignoring duplicate BEGAN event');
+      return;
     } else if ((state === State.END || state === State.CANCELLED || state === State.FAILED) && isDraggingRef.current) {
       const finalPosition = lastDragPositionRef.current || targetPosition || playbackPosition;
       console.log(`DRAG END - finalPosition: ${finalPosition}, clearing drag state first`);
@@ -803,12 +850,15 @@ export const RecordingStudioScreen: React.FC = () => {
       isDraggingRef.current = false;
       setIsDragging(false);
 
-      // Update position and resume
+      // Record when this drag ended for cooldown
+      lastDragEndTime.current = Date.now();
+
+      // Update position but keep paused
       setPlaybackPosition(finalPosition);
 
-      // Resume playback immediately
-      console.log('Resuming playback after drag');
-      seekToPosition(finalPosition, wasPlayingBeforeDrag.current);
+      // Seek to new position but stay paused (don't resume playback)
+      console.log('Seeking to new position after drag - staying paused');
+      seekToPosition(finalPosition, false);
 
       wasPlayingBeforeDrag.current = false;
     }
