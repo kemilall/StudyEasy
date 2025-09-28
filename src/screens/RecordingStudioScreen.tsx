@@ -64,8 +64,8 @@ export const RecordingStudioScreen: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackPosition, setPlaybackPosition] = useState(0);
   const [playbackDuration, setPlaybackDuration] = useState(0);
-  const [currentPlayingSegmentIndex, setCurrentPlayingSegmentIndex] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [progressBarWidth, setProgressBarWidth] = useState(0);
   
   // Refs
   const appState = useRef(AppState.currentState);
@@ -206,7 +206,6 @@ export const RecordingStudioScreen: React.FC = () => {
         setSound(null);
         setIsPlaying(false);
         setPlaybackPosition(0);
-        setCurrentPlayingSegmentIndex(0);
       })() : Promise.resolve();
 
       // Create lesson if needed (en parallèle)
@@ -536,8 +535,7 @@ export const RecordingStudioScreen: React.FC = () => {
         // Otherwise start from beginning
         console.log('Starting from beginning');
         setPlaybackPosition(0);
-        setCurrentPlayingSegmentIndex(0);
-        await playSegment(0);
+        await playSequentialAudio(0);
       }
     } catch (error) {
       console.error('Error starting playback:', error);
@@ -545,46 +543,18 @@ export const RecordingStudioScreen: React.FC = () => {
     }
   };
 
-  const playSegment = async (index: number) => {
+  const playSequentialAudio = async (startSegmentIndex: number = 0) => {
     try {
       // Don't play if we're currently dragging
       if (isDraggingRef.current) {
-        console.log('Not playing segment - currently dragging');
+        console.log('Not playing - currently dragging');
         return;
       }
 
       const validSegments = segments.filter(seg => seg.durationMillis > 100);
-      if (index >= validSegments.length) {
-        // All segments played
-        console.log('All segments played');
+      if (validSegments.length === 0) {
+        console.log('No valid segments to play');
         setIsPlaying(false);
-        setPlaybackPosition(0);
-        setCurrentPlayingSegmentIndex(0);
-
-        // Clean up current sound
-        if (soundRef.current) {
-          await soundRef.current.unloadAsync();
-          soundRef.current = null;
-          setSound(null);
-        }
-
-        // Reset audio mode for recording
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: true,
-        });
-        return;
-      }
-
-      const segment = validSegments[index];
-      console.log(`Playing segment ${index}:`, segment.uri);
-      
-      // Check if file exists and is valid
-      const fileInfo = await FileSystem.getInfoAsync(segment.uri);
-      if (!fileInfo.exists || (fileInfo.size && fileInfo.size < 1000)) {
-        console.log('Skipping invalid segment:', segment.uri);
-        await playSegment(index + 1);
         return;
       }
 
@@ -595,53 +565,97 @@ export const RecordingStudioScreen: React.FC = () => {
         setSound(null);
       }
 
-      // Calculate accumulated duration for this segment
-      let accumulatedDuration = 0;
-      for (let i = 0; i < index; i++) {
-        if (validSegments[i]) {
-          accumulatedDuration += validSegments[i].durationMillis;
-        }
-      }
-
-      // Create and play new sound
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: segment.uri },
-        { 
-          shouldPlay: true,
-          isLooping: false,
-          volume: 1.0,
-        },
-        (status) => {
-          if (status.isLoaded) {
-            playbackStatusRef.current = status;
-
-            // Always update position if playing, regardless of dragging state
-            if (status.isPlaying) {
-              const globalPosition = accumulatedDuration + (status.positionMillis || 0);
-              setPlaybackPosition(globalPosition);
-              setPlaybackDuration(totalDurationMillis);
-            }
-
-            if (status.didJustFinish && !isDraggingRef.current) {
-              console.log(`Segment ${index} finished, playing next`);
-              // Play next segment
-              setTimeout(() => {
-                playSegment(index + 1);
-              }, 100);
-            }
-          }
-        }
-      );
-
-      soundRef.current = newSound;
-      setSound(newSound);
-      setCurrentPlayingSegmentIndex(index);
+      // Start playing from the specified segment index
+      await playSegmentSequentially(startSegmentIndex);
 
     } catch (error) {
-      console.error('Error playing segment:', error);
+      console.error('Error playing sequential audio:', error);
       Alert.alert('Erreur', 'Impossible de lire l\'enregistrement');
       setIsPlaying(false);
     }
+  };
+
+  const playSegmentSequentially = async (segmentIndex: number) => {
+    const validSegments = segments.filter(seg => seg.durationMillis > 100);
+    if (segmentIndex >= validSegments.length) {
+      console.log('All segments finished');
+      setIsPlaying(false);
+      setPlaybackPosition(0);
+
+      // Reset audio mode for recording
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+      });
+      return;
+    }
+
+    const segment = validSegments[segmentIndex];
+    console.log(`Playing segment ${segmentIndex}:`, segment.uri);
+
+    // Check if file exists and is valid
+    const fileInfo = await FileSystem.getInfoAsync(segment.uri);
+    if (!fileInfo.exists || (fileInfo.size && fileInfo.size < 1000)) {
+      console.log('Invalid audio file:', segment.uri);
+      // Try next segment
+      await playSegmentSequentially(segmentIndex + 1);
+      return;
+    }
+
+    // Calculate position within this segment (if we're resuming from middle)
+    let positionInSegment = 0;
+    if (playbackPosition > 0) {
+      let accumulatedDuration = 0;
+      for (let i = 0; i < segmentIndex; i++) {
+        accumulatedDuration += validSegments[i].durationMillis;
+      }
+      positionInSegment = playbackPosition - accumulatedDuration;
+      positionInSegment = Math.max(0, Math.min(positionInSegment, segment.durationMillis));
+    }
+
+    // Create and play sound
+    const { sound: newSound } = await Audio.Sound.createAsync(
+      { uri: segment.uri },
+      {
+        shouldPlay: true,
+        isLooping: false,
+        volume: 1.0,
+        positionMillis: positionInSegment,
+      },
+      (status) => {
+        if (status.isLoaded) {
+          playbackStatusRef.current = status;
+
+          // Update global position if playing
+          if (status.isPlaying && !isDraggingRef.current) {
+            // Calculate global position
+            let globalPosition = 0;
+            for (let i = 0; i < segmentIndex; i++) {
+              globalPosition += validSegments[i].durationMillis;
+            }
+            globalPosition += status.positionMillis || 0;
+
+            setPlaybackPosition(globalPosition);
+            setPlaybackDuration(totalDurationMillis);
+          }
+
+          // When this segment finishes, play the next one
+          if (status.didJustFinish && !isDraggingRef.current) {
+            console.log(`Segment ${segmentIndex} finished, playing next`);
+            playSegmentSequentially(segmentIndex + 1);
+          }
+        }
+      }
+    );
+
+    soundRef.current = newSound;
+    setSound(newSound);
+  };
+
+  const playSegment = async (index: number) => {
+    // Legacy function - now calls sequential audio
+    await playSequentialAudio(index);
   };
 
   const pausePlayback = async () => {
@@ -649,6 +663,7 @@ export const RecordingStudioScreen: React.FC = () => {
       try {
         await soundRef.current.pauseAsync();
         setIsPlaying(false);
+        console.log('Playback paused at position:', playbackPosition);
       } catch (error) {
         console.error('Error pausing playback:', error);
       }
@@ -663,11 +678,10 @@ export const RecordingStudioScreen: React.FC = () => {
         soundRef.current = null;
         setSound(null);
       }
-      
+
       setIsPlaying(false);
-      setPlaybackPosition(0);
-      setCurrentPlayingSegmentIndex(0);
-      
+      // Don't reset playback position - user might want to resume later
+
       // Reset audio mode for recording
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
@@ -706,23 +720,6 @@ export const RecordingStudioScreen: React.FC = () => {
 
       console.log('Seeking to position:', targetPositionMillis, 'shouldPlay:', shouldPlay, 'isDragging:', isDraggingRef.current);
 
-      // Find which segment contains this position
-      let accumulatedDuration = 0;
-      let targetSegmentIndex = 0;
-      let positionInSegment = 0;
-
-      const validSegments = segments.filter(seg => seg.durationMillis > 100);
-
-      for (let i = 0; i < validSegments.length; i++) {
-        const segment = validSegments[i];
-        if (targetPositionMillis <= accumulatedDuration + segment.durationMillis) {
-          targetSegmentIndex = i;
-          positionInSegment = targetPositionMillis - accumulatedDuration;
-          break;
-        }
-        accumulatedDuration += segment.durationMillis;
-      }
-
       // Stop current playback if exists
       if (soundRef.current) {
         await soundRef.current.stopAsync();
@@ -733,12 +730,24 @@ export const RecordingStudioScreen: React.FC = () => {
 
       // Update position immediately for UI feedback
       setPlaybackPosition(targetPositionMillis);
-      setCurrentPlayingSegmentIndex(targetSegmentIndex);
 
-      // Create the sound at the target position
+      // Find which segment contains the target position and start from there
+      const validSegments = segments.filter(seg => seg.durationMillis > 100);
+      let accumulatedDuration = 0;
+      let targetSegmentIndex = 0;
+
+      for (let i = 0; i < validSegments.length; i++) {
+        if (targetPositionMillis <= accumulatedDuration + validSegments[i].durationMillis) {
+          targetSegmentIndex = i;
+          break;
+        }
+        accumulatedDuration += validSegments[i].durationMillis;
+      }
+
+      // Calculate position within the target segment
+      const positionInSegment = targetPositionMillis - accumulatedDuration;
+
       if (validSegments[targetSegmentIndex]) {
-        const segmentAccumulatedDuration = accumulatedDuration;
-        
         const { sound: newSound } = await Audio.Sound.createAsync(
           { uri: validSegments[targetSegmentIndex].uri },
           {
@@ -751,19 +760,18 @@ export const RecordingStudioScreen: React.FC = () => {
             if (status.isLoaded) {
               playbackStatusRef.current = status;
 
-              // Only update position if actually playing and not dragging
+              // Update global position if actually playing
               if (status.isPlaying && !isDraggingRef.current) {
-                const globalPosition = segmentAccumulatedDuration + (status.positionMillis || 0);
+                // Calculate global position
+                let globalPosition = accumulatedDuration + (status.positionMillis || 0);
                 setPlaybackPosition(globalPosition);
                 setPlaybackDuration(totalDurationMillis);
               }
 
-              // Only auto-advance if not dragging
+              // When this segment finishes, continue with next segments
               if (status.didJustFinish && !isDraggingRef.current) {
                 console.log(`Segment ${targetSegmentIndex} finished after seek, playing next`);
-                setTimeout(() => {
-                  playSegment(targetSegmentIndex + 1);
-                }, 100);
+                playSegmentSequentially(targetSegmentIndex + 1);
               }
             }
           }
@@ -783,8 +791,10 @@ export const RecordingStudioScreen: React.FC = () => {
     if (!hasAnyRecording || isRecording) return;
 
     const { x } = event.nativeEvent;
-    const progressBarWidth = screenWidth - 144;
-    const progress = Math.max(0, Math.min(1, x / progressBarWidth));
+    // Use measured width; fallback to computed estimate if 0
+    const usableWidth = progressBarWidth || (screenWidth - 40 - 50 - 50 - 36 - 40);
+
+    const progress = Math.max(0, Math.min(1, x / usableWidth));
     const targetPosition = progress * totalDurationMillis;
 
     // Update position visually during drag and store last position
@@ -804,8 +814,9 @@ export const RecordingStudioScreen: React.FC = () => {
       return;
     }
 
-    const progressBarWidth = screenWidth - 144;
-    const progress = Math.max(0, Math.min(1, (x ?? 0) / progressBarWidth));
+    // Use measured width; fallback to computed estimate if 0
+    const usableWidth = progressBarWidth || (screenWidth - 40 - 50 - 50 - 36 - 40);
+    const progress = Math.max(0, Math.min(1, (x ?? 0) / usableWidth));
     const targetPosition = progress * totalDurationMillis;
 
     console.log(`Progress Pan State Change - State: ${State[state]}, x: ${x}, computedPos: ${targetPosition}, isDragging: ${isDraggingRef.current}`);
@@ -919,13 +930,13 @@ export const RecordingStudioScreen: React.FC = () => {
               onGestureEvent={handleProgressPanGesture}
               onHandlerStateChange={handleProgressPanStateChange}
             >
-              <View style={styles.progressBarContainer}>
+              <View style={styles.progressBarContainer} onLayout={(e) => setProgressBarWidth(e.nativeEvent.layout.width)}>
                 <View style={styles.progressBarBackground}>
                   <View 
                     style={[
                       styles.progressBarFill,
                       { 
-                        width: `${totalDurationMillis > 0 ? (playbackPosition / totalDurationMillis) * 100 : 0}%` 
+                        width: `${totalDurationMillis > 0 ? Math.min(100, Math.max(0, (playbackPosition / totalDurationMillis) * 100)) : 0}%` 
                       }
                     ]} 
                   />
@@ -933,7 +944,7 @@ export const RecordingStudioScreen: React.FC = () => {
                     style={[
                       styles.progressThumb,
                       { 
-                        left: `${totalDurationMillis > 0 ? (playbackPosition / totalDurationMillis) * 100 : 0}%` 
+                        left: `${totalDurationMillis > 0 ? Math.min(100, Math.max(0, (playbackPosition / totalDurationMillis) * 100)) : 0}%` 
                       }
                     ]} 
                   />
