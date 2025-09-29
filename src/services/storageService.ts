@@ -100,10 +100,10 @@ export class StorageService {
   static async uploadAudio(
     audioFile: Blob | Uint8Array | ArrayBuffer,
     userId: string,
-    chapterId: string,
+    lessonId: string,
     onProgress?: (progress: UploadProgress) => void
   ): Promise<string> {
-    const path = `audio/${userId}/${chapterId}/${Date.now()}.m4a`;
+    const path = `audio/${userId}/${lessonId}/${Date.now()}.m4a`;
     return this.uploadFile(audioFile, path, onProgress);
   }
 
@@ -111,12 +111,12 @@ export class StorageService {
   static async uploadDocument(
     documentFile: Blob | Uint8Array | ArrayBuffer,
     userId: string,
-    chapterId: string,
+    lessonId: string,
     fileName: string,
     onProgress?: (progress: UploadProgress) => void
   ): Promise<string> {
     const extension = fileName.split('.').pop() || 'txt';
-    const path = `documents/${userId}/${chapterId}/${Date.now()}.${extension}`;
+    const path = `documents/${userId}/${lessonId}/${Date.now()}.${extension}`;
     return this.uploadFile(documentFile, path, onProgress);
   }
 

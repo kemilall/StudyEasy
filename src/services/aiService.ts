@@ -5,7 +5,7 @@ import { API_BASE_URL } from '../config/api';
 // API base URL now resolved dynamically for simulator/device
 // Force reload: ${Date.now()}
 
-interface ProcessedChapterResponse {
+interface ProcessedLessonResponse {
   transcription: string;
   course: {
     title: string;
@@ -27,10 +27,11 @@ interface ProcessedChapterResponse {
   }>;
   key_points: string[];
   summary: string;
+  lesson_id: string;
 }
 
 export interface ProcessingStatus {
-  chapter_id: string;
+  lesson_id: string;
   current_step: number;
   total_steps: number;
   step_name: string;
@@ -40,10 +41,10 @@ export interface ProcessingStatus {
 }
 
 export class AIService {
-  // Get processing status for a chapter
-  static async getProcessingStatus(chapterId: string): Promise<ProcessingStatus> {
+  // Get processing status for a lesson
+  static async getProcessingStatus(lessonId: string): Promise<ProcessingStatus> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/processing-status/${chapterId}`);
+      const response = await fetch(`${API_BASE_URL}/api/processing-status/${lessonId}`);
       
       if (!response.ok) {
         throw new Error(`Failed to get processing status: ${response.statusText}`);
@@ -179,12 +180,12 @@ export class AIService {
     }
   }
 
-  // Process chapter with AI
-  static async processChapter(
-    chapterId: string, 
-    audioUrl?: string, 
+  // Process lesson with AI
+  static async processLesson(
+    lessonId: string,
+    audioUrl?: string,
     documentText?: string,
-    chapterInfo?: { chapter: { name: string }; lesson: Lesson; subject: Subject },
+    lessonInfo?: { lesson: Lesson; subject: Subject },
     originalFileName?: string,
     originalMimeType?: string
   ): Promise<{
@@ -193,30 +194,30 @@ export class AIService {
     bulletPoints: string[];
     flashcards: Flashcard[];
     quiz: QuizQuestion[];
-    processingChapterId?: string; // Backend chapter_id for progress tracking
+    processingLessonId?: string; // Backend lesson_id for progress tracking
   }> {
     try {
       let text = documentText || '';
       
       // If there's an audio file, transcribe it first  
       // Generate a unique processing ID for progress tracking
-      let processingChapterId: string | undefined;
-      
+      let processingLessonId: string | undefined;
+
       if (audioUrl && !documentText) {
         text = await this.transcribeAudio(audioUrl, originalFileName, originalMimeType);
       }
-      
-      // Process the chapter with AI
-      const response = await fetch(`${API_BASE_URL}/api/process-chapter`, {
+
+      // Process the lesson with AI
+      const response = await fetch(`${API_BASE_URL}/api/process-lesson`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           text,
-          chapter_name: chapterInfo?.chapter.name || 'Chapitre',
-          lesson_name: chapterInfo?.lesson.name || 'Leçon',
-          subject_name: chapterInfo?.subject.name || 'Matière',
+          chapter_name: lessonInfo?.lesson.name || 'Leçon',
+          lesson_name: lessonInfo?.lesson.name || 'Leçon',
+          subject_name: lessonInfo?.subject.name || 'Matière',
         }),
       });
       
@@ -224,10 +225,10 @@ export class AIService {
         throw new Error(`Processing failed: ${response.statusText}`);
       }
       
-      const data: ProcessedChapterResponse & { chapter_id?: string } = await response.json();
-      
-      // Extract processing chapter ID from response
-      processingChapterId = data.chapter_id;
+      const data: ProcessedLessonResponse = await response.json();
+
+      // Extract processing lesson ID from response
+      processingLessonId = data.lesson_id;
       
       // Transform the response to match our frontend format
       const flashcards: Flashcard[] = data.flashcards.map((fc, index) => ({
@@ -245,8 +246,8 @@ export class AIService {
       }));
       
       // Update lesson in Firebase with the generated content
-      if (chapterId) {
-        await DataService.updateLesson(chapterId, {
+      if (lessonId) {
+        await DataService.updateLesson(lessonId, {
           transcription: data.transcription,
           summary: data.summary,
           keyPoints: data.key_points,
@@ -254,14 +255,14 @@ export class AIService {
           quiz,
         });
       }
-    
+
     return {
         transcription: data.transcription,
         summary: data.summary,
         bulletPoints: data.key_points,
         flashcards,
         quiz,
-        processingChapterId, // Return the backend chapter ID for progress tracking
+        processingLessonId, // Return the backend lesson ID for progress tracking
       };
     } catch (error) {
       console.error('Chapter processing error:', error);

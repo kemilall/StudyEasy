@@ -177,6 +177,69 @@ async def transcribe_audio(file: UploadFile = File(...), lesson_id: str = Form(N
 
 @app.post("/api/process-lesson")
 async def process_lesson(request: CourseGenerationRequest):
+    """Process text input to generate complete lesson content in parallel"""
+    # Generate a unique lesson_id for this processing session
+    import uuid
+    lesson_id = str(uuid.uuid4())
+
+    try:
+        logger.info(f"=== STARTING LESSON PROCESSING ===")
+        logger.info(f"Processing text length: {len(request.text)} characters")
+        logger.info(f"Lesson: {request.lesson_name}, Subject: {request.subject_name}")
+
+        # Initialize processing status
+        update_processing_status(
+            lesson_id=lesson_id,
+            step=0,
+            total_steps=5,
+            step_name="Initialisation",
+            step_description="Préparation du traitement du contenu"
+        )
+
+        # Process the input text to generate all chapter content in parallel
+        processed_chapter = await ai_service.process_chapter(
+            text=request.text,
+            chapter_name=request.chapter_name,
+            lesson_name=request.lesson_name,
+            subject_name=request.subject_name
+        )
+
+        # Convert ProcessedChapter to dictionary and add lesson_id
+        try:
+            # Try modern Pydantic method first
+            course_dict = processed_chapter.course.model_dump() if hasattr(processed_chapter.course, 'model_dump') else processed_chapter.course.dict()
+        except:
+            # Fallback to basic dict conversion
+            course_dict = processed_chapter.course.__dict__ if hasattr(processed_chapter.course, '__dict__') else processed_chapter.course
+
+        result = {
+            "transcription": processed_chapter.transcription,
+            "course": course_dict,
+            "flashcards": processed_chapter.flashcards,
+            "quiz": processed_chapter.quiz,
+            "key_points": processed_chapter.key_points,
+            "summary": processed_chapter.summary,
+            "lesson_id": lesson_id
+        }
+
+        logger.info(f"=== LESSON PROCESSING COMPLETED SUCCESSFULLY ===")
+        return result
+
+    except Exception as e:
+        logger.error(f"Lesson processing error: {str(e)}")
+        # Update status with error
+        update_processing_status(
+            lesson_id=lesson_id,
+            step=0,
+            total_steps=5,
+            step_name="Erreur",
+            step_description="Une erreur est survenue lors du traitement",
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/process-lesson")
+async def process_lesson(request: CourseGenerationRequest):
     """Process text input to generate complete lesson content"""
     # Generate a unique lesson_id for this processing session
     import uuid

@@ -122,15 +122,22 @@ class AIService:
             raise
     
     async def process_chapter(
-        self, 
-        text: str, 
+        self,
+        text: str,
         chapter_name: str,
         lesson_name: str,
         subject_name: str
     ) -> ProcessedChapter:
-        """Process chapter text to generate all components in parallel"""
+        """Process lesson text to generate all components in parallel"""
         try:
+            logger.info("=== STARTING PARALLEL PROCESSING ===")
+            logger.info(f"Processing lesson: {lesson_name}, subject: {subject_name}")
+            logger.info(f"Text length: {len(text)} characters")
+
             # Run all AI generations in parallel
+            logger.info("Creating parallel tasks for: course, flashcards, quiz, key_points, summary")
+            start_time = asyncio.get_event_loop().time()
+
             tasks = [
                 self.generate_structured_course(text, chapter_name, lesson_name, subject_name),
                 self.generate_flashcards(text),
@@ -138,9 +145,16 @@ class AIService:
                 self._extract_key_points(text),
                 self._generate_summary(text)
             ]
-            
+
+            logger.info("Starting parallel execution with asyncio.gather...")
             results = await asyncio.gather(*tasks)
-            
+
+            end_time = asyncio.get_event_loop().time()
+            total_time = end_time - start_time
+            logger.info(f"=== PARALLEL PROCESSING COMPLETED ===")
+            logger.info(f"Total execution time: {total_time:.2f} seconds")
+            logger.info(f"Results: course={type(results[0])}, flashcards={len(results[1])}, quiz={len(results[2])}, key_points={len(results[3])}, summary={len(results[4])} chars")
+
             return ProcessedChapter(
                 transcription=text,
                 course=results[0],
@@ -149,7 +163,7 @@ class AIService:
                 key_points=results[3],
                 summary=results[4]
             )
-            
+
         except Exception as e:
             logger.error(f"Chapter processing error: {str(e)}")
             raise
@@ -161,11 +175,11 @@ class AIService:
         lesson_name: str,
         subject_name: str
     ) -> StructuredCourse:
-        """Generate a structured course from input text using GPT-5"""
+        """Generate a structured course from input text using GPT-4.1"""
         try:
             if self.client is None:
                 raise ValueError("OPENAI_API_KEY not set; content generation requires OpenAI.")
-            logger.info("Generating structured course")
+            logger.info(f"[PARALLEL] Starting structured course generation for lesson '{lesson_name}'")
 
             def _generate():
                 response = self.client.responses.create(
@@ -215,7 +229,7 @@ Transform this into a comprehensive, organized course that preserves all essenti
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(self.executor, _generate)
 
-            logger.info("Course generation completed")
+            logger.info(f"[PARALLEL] Course generation completed for lesson '{lesson_name}'")
             return result
 
         except Exception as e:
@@ -223,15 +237,15 @@ Transform this into a comprehensive, organized course that preserves all essenti
             raise
     
     async def generate_flashcards(self, text: str, max_cards: int = 20) -> List[Flashcard]:
-        """Generate flashcards from text using GPT-5"""
+        """Generate flashcards from text using GPT-4.1"""
         try:
             if self.client is None:
                 raise ValueError("OPENAI_API_KEY not set; flashcard generation requires OpenAI.")
-            logger.info(f"Generating up to {max_cards} flashcards")
+            logger.info(f"[PARALLEL] Starting flashcards generation (max {max_cards} cards)")
 
             def _generate():
                 response = self.client.responses.create(
-                    model="gpt-5",
+                    model="gpt-4.1",
                     input=[
                         {
                             "role": "developer",
@@ -278,7 +292,7 @@ Generate at least {max_cards} flashcards covering all key concepts."""
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(self.executor, _generate)
 
-            logger.info(f"Generated {len(result)} flashcards")
+            logger.info(f"[PARALLEL] Flashcards generation completed: {len(result)} cards")
             return result
 
         except Exception as e:
@@ -286,15 +300,15 @@ Generate at least {max_cards} flashcards covering all key concepts."""
             raise
     
     async def generate_quiz(self, text: str, num_questions: int = 10) -> List[QuizQuestion]:
-        """Generate quiz questions from text using GPT-5"""
+        """Generate quiz questions from text using GPT-4.1"""
         try:
             if self.client is None:
                 raise ValueError("OPENAI_API_KEY not set; quiz generation requires OpenAI.")
-            logger.info(f"Generating {num_questions} quiz questions")
+            logger.info(f"[PARALLEL] Starting quiz generation ({num_questions} questions)")
 
             def _generate():
                 response = self.client.responses.create(
-                    model="gpt-5",
+                    model="gpt-4.1",
                     input=[
                         {
                             "role": "developer",
@@ -344,7 +358,7 @@ Ensure questions cover different aspects of the content and test real understand
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(self.executor, _generate)
 
-            logger.info(f"Generated {len(result)} quiz questions")
+            logger.info(f"[PARALLEL] Quiz generation completed: {len(result)} questions")
             return result
 
         except Exception as e:
@@ -393,7 +407,7 @@ If asked about something not in the course, politely redirect to the course mate
                 })
 
                 response = self.client.responses.create(
-                    model="gpt-5",
+                    model="gpt-4.1",
                     input=input_messages
                 )
 
@@ -414,9 +428,10 @@ If asked about something not in the course, politely redirect to the course mate
         try:
             if self.client is None:
                 raise ValueError("OPENAI_API_KEY not set; key point extraction requires OpenAI.")
+            logger.info(f"[PARALLEL] Starting key points extraction")
             def _extract():
                 response = self.client.responses.create(
-                    model="gpt-5",
+                    model="gpt-4.1",
                     input=[
                         {
                             "role": "developer",
@@ -444,7 +459,9 @@ If asked about something not in the course, politely redirect to the course mate
                 return key_points_data
 
             loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(self.executor, _extract)
+            result = await loop.run_in_executor(self.executor, _extract)
+            logger.info(f"[PARALLEL] Key points extraction completed: {len(result)} points")
+            return result
 
         except Exception as e:
             logger.error(f"Key points extraction error: {str(e)}")
@@ -455,9 +472,10 @@ If asked about something not in the course, politely redirect to the course mate
         try:
             if self.client is None:
                 raise ValueError("OPENAI_API_KEY not set; summarization requires OpenAI.")
+            logger.info(f"[PARALLEL] Starting summary generation")
             def _summarize():
                 response = self.client.responses.create(
-                    model="gpt-5",
+                    model="gpt-4.1",
                     input=[
                         {
                             "role": "developer",
@@ -473,7 +491,9 @@ If asked about something not in the course, politely redirect to the course mate
                 return response.output_text
 
             loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(self.executor, _summarize)
+            result = await loop.run_in_executor(self.executor, _summarize)
+            logger.info(f"[PARALLEL] Summary generation completed: {len(result)} characters")
+            return result
 
         except Exception as e:
             logger.error(f"Summary generation error: {str(e)}")

@@ -131,33 +131,32 @@ export const ProcessingScreen: React.FC = () => {
           transcriptionText = await AIService.transcribeAudio(localUri || (audioUrl as string), fileName, mimeType);
         }
 
-        // Step 3: Génération du cours
-        updateProgress((localUri || audioUrl) && !documentText ? 3 : 2, stepsCount, 'Génération du cours', 'Création du contenu structuré');
-        const course = await AIService.generateCourse(
+        // Step 3-5: Traitement parallèle (cours, flashcards, quiz)
+        updateProgress((localUri || audioUrl) && !documentText ? 3 : 2, stepsCount, 'Génération du contenu', 'Traitement parallèle en cours...');
+
+        // Utiliser processLesson() qui fait tout en parallèle dans le backend
+        const processedContent = await AIService.processLesson(
+          lessonId,
+          localUri || (audioUrl as string),
           transcriptionText,
-          lesson.name,
-          lesson.name,
-          subject.name
+          {
+            lesson: lesson,
+            subject: subject
+          },
+          fileName,
+          mimeType
         );
-
-        // Step 4: Création des flashcards
-        updateProgress((localUri || audioUrl) && !documentText ? 4 : 3, stepsCount, 'Création des flashcards', 'Extraction des concepts clés');
-        const flashcards = await AIService.generateFlashcards(transcriptionText, 20);
-
-        // Step 5: Génération du quiz
-        updateProgress((localUri || audioUrl) && !documentText ? 5 : 4, stepsCount, 'Génération du quiz', 'Création des questions d\'évaluation');
-        const quiz = await AIService.generateQuiz(transcriptionText, 10);
 
         // Step 6: Finalisation
         updateProgress(stepsCount, stepsCount, 'Finalisation', 'Sauvegarde du contenu');
 
         // Persist results in Firebase
         await DataService.updateLesson(lessonId, {
-          transcription: transcriptionText,
-          summary: course.summary,
-          keyPoints: course.key_points,
-          flashcards,
-          quiz,
+          transcription: processedContent.transcription,
+          summary: processedContent.summary,
+          keyPoints: processedContent.bulletPoints,
+          flashcards: processedContent.flashcards,
+          quiz: processedContent.quiz,
           status: 'completed',
           isCompleted: true,
         });

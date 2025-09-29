@@ -106,14 +106,14 @@ export const QuizScreen: React.FC = () => {
     );
   }
 
-  if (!chapter || !questions.length) {
+  if (!lesson || !questions.length) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <Ionicons name="help-circle-outline" size={64} color={Colors.text.tertiary} />
           <Text style={styles.errorTitle}>Aucun quiz</Text>
           <Text style={styles.errorSubtitle}>
-            Le quiz de ce chapitre n'est pas encore prêt
+            Le quiz de cette leçon n'est pas encore prêt
           </Text>
           <TouchableOpacity 
             style={styles.backButton}

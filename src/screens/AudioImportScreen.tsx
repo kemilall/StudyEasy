@@ -82,27 +82,16 @@ export const AudioImportScreen: React.FC = () => {
     setIsUploading(true);
     
     try {
-      // 1. Create lesson only now (avoid saving before audio is provided)
+      // 1. Create lesson and mark as processing
       const lessonId = await DataService.createLesson(user.uid, {
         subjectId,
         name: lessonName.trim(),
-        chaptersCount: 0,
-        completedChapters: 0,
         duration: 0,
         status: 'processing',
-      } as any);
-
-      // 2. Create chapter for this lesson and mark as processing
-      const chapterId = await (DataService as any).createChapter(user.uid, {
-        lessonId,
-        name: selectedFile.name ? selectedFile.name.replace(/\.[^/.]+$/, "") : "Nouveau chapitre",
-        isProcessing: true,
-        isCompleted: false,
-        duration: 0,
       });
 
       // 3. Upload audio file using the new FileUploadService
-      const storagePath = `audio/${user.uid}/${chapterId}/${Date.now()}.m4a`;
+      const storagePath = `audio/${user.uid}/${lessonId}/${Date.now()}.m4a`;
       
       let audioUrl: string;
       try {
@@ -122,14 +111,14 @@ export const AudioImportScreen: React.FC = () => {
         );
       }
 
-      // 4. Update chapter with audio URL
-      await (DataService as any).updateChapter(chapterId, { audioUrl });
+      // 4. Update lesson with audio URL
+      await DataService.updateLesson(lessonId, { audioUrl });
 
       // 5. Navigate to processing screen for AI processing (include local file metadata)
       navigation.navigate('ProcessingScreen' as never, {
-        chapterId,
-        audioUrl,
         lessonId,
+        subjectId,
+        audioUrl,
         localUri: selectedFile.uri,
         fileName: selectedFile.name,
         mimeType: selectedFile.mimeType,

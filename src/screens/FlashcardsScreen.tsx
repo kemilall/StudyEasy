@@ -101,14 +101,14 @@ export const FlashcardsScreen: React.FC = () => {
     );
   }
 
-  if (!chapter || !flashcards.length) {
+  if (!lesson || !flashcards.length) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <Ionicons name="albums-outline" size={64} color={Colors.text.tertiary} />
           <Text style={styles.errorTitle}>Aucune flashcard</Text>
           <Text style={styles.errorSubtitle}>
-            Les flashcards de ce chapitre ne sont pas encore prêtes
+            Les flashcards de cette leçon ne sont pas encore prêtes
           </Text>
           <TouchableOpacity 
             style={styles.backButton}
