@@ -4,14 +4,16 @@ import logging
 from typing import List, Dict, Optional, Any
 from openai import OpenAI
 from models import (
-    Flashcard, 
-    QuizQuestion, 
+    Flashcard,
+    QuizQuestion,
     StructuredCourse,
     ProcessedChapter
 )
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import httpx
+from pydub import AudioSegment
+import tempfile
 
 logger = logging.getLogger(__name__)
 
@@ -33,19 +35,50 @@ class AIService:
 
             logger.info(f"Transcribing audio file with ElevenLabs: {audio_path}")
 
+            # Log file details
+            file_size = os.path.getsize(audio_path)
+            logger.info(f"Audio file size: {file_size} bytes")
+
+            # Note: Files are now recorded as WAV directly, no conversion needed
+            file_ext = os.path.splitext(audio_path)[1].lower()
+            logger.info(f"Processing {file_ext.upper()} audio file - no conversion needed")
+
             def _transcribe() -> str:
                 url = "https://api.elevenlabs.io/v1/speech-to-text"
                 headers = {
                     "xi-api-key": self.eleven_api_key,
                 }
-                # Omit language_code to keep it null (auto-detect)
-                data = {
-                    "model_id": self.eleven_model_id,
-                }
+                # Determine content type based on file extension
                 filename = os.path.basename(audio_path)
-                content_type = "application/octet-stream"
+                file_ext = os.path.splitext(filename)[1].lower()
+
+                # Map file extensions to proper MIME types
+                content_type_map = {
+                    '.mp3': 'audio/mpeg',
+                    '.wav': 'audio/wav',
+                    '.flac': 'audio/flac',
+                    '.m4a': 'audio/m4a',
+                    '.aac': 'audio/aac',
+                    '.ogg': 'audio/ogg',
+                    '.webm': 'audio/webm'
+                }
+
+                content_type = content_type_map.get(file_ext, 'audio/wav')
+
+                # Omit language_code to keep it null (auto-detect)
+                # Note: model_id might not be required for current ElevenLabs API
+                data = {}
+                # Only include model_id if it's specified and not empty
+                if self.eleven_model_id and self.eleven_model_id.strip():
+                    data["model_id"] = self.eleven_model_id
+
                 with open(audio_path, "rb") as f:
-                    files = {"file": (filename, f, content_type)}
+                    file_content = f.read()
+                    logger.info(f"Read {len(file_content)} bytes from file")
+                    files = {"file": (filename, file_content, content_type)}
+                    logger.info(f"Sending request to ElevenLabs with content_type: {content_type}")
+                    logger.info(f"Request data: {data}")
+
                     response = httpx.post(
                         url,
                         headers=headers,
@@ -53,6 +86,20 @@ class AIService:
                         files=files,
                         timeout=120
                     )
+
+                logger.info(f"ElevenLabs response status: {response.status_code}")
+                logger.info(f"ElevenLabs response headers: {dict(response.headers)}")
+
+                if response.status_code != 200:
+                    logger.error(f"ElevenLabs error response: {response.text}")
+                    logger.error(f"ElevenLabs error status: {response.status_code}")
+                    # Try to get more detailed error info
+                    try:
+                        error_data = response.json()
+                        logger.error(f"ElevenLabs error details: {error_data}")
+                    except:
+                        logger.error("Could not parse ElevenLabs error response as JSON")
+
                 response.raise_for_status()
                 payload = response.json()
                 # Prefer text field; fallback to joining words if needed
@@ -122,7 +169,7 @@ class AIService:
 
             def _generate():
                 response = self.client.responses.create(
-                    model="gpt-5",
+                    model="gpt-4.1",
                     input=[
                         {
                             "role": "developer",

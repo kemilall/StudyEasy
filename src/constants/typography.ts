@@ -77,4 +77,19 @@ export const Typography = {
     lineHeight: 13,
     letterSpacing: 0,
   } as TextStyle,
+
+  // Alias for backward compatibility
+  h3: {
+    fontSize: 20,
+    fontWeight: '600',
+    lineHeight: 25,
+    letterSpacing: -0.2,
+  } as TextStyle,
+
+  caption: {
+    fontSize: 12,
+    fontWeight: '400',
+    lineHeight: 16,
+    letterSpacing: 0,
+  } as TextStyle,
 };

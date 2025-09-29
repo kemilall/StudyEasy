@@ -187,15 +187,87 @@ export class DataService {
   // Get single lesson
   static async getLesson(lessonId: string): Promise<Lesson | null> {
     try {
+      if (!lessonId || typeof lessonId !== 'string') {
+        throw new Error('Invalid lessonId provided to getLesson');
+      }
       const lessonDoc = await getDoc(doc(db, 'lessons', lessonId));
       if (lessonDoc.exists()) {
-        return {
-          id: lessonDoc.id,
-          ...lessonDoc.data(),
-          createdAt: lessonDoc.data().createdAt.toDate(),
-          updatedAt: lessonDoc.data().updatedAt.toDate()
-        } as Lesson;
+        const data = lessonDoc.data();
+        console.log('Lesson data keys:', Object.keys(data || {}));
+        console.log('Lesson data:', data);
+
+        if (!data) {
+          console.error('Lesson document exists but has no data');
+          return null;
+        }
+
+        // Validate data structure
+        const requiredFields = ['name', 'subjectId', 'userId'];
+        const missingFields = requiredFields.filter(field => !data[field]);
+        if (missingFields.length > 0) {
+          console.error('Lesson missing required fields:', missingFields, 'Data:', data);
+          return null;
+        }
+
+        // Check if dates exist and are valid Firestore timestamps
+        if (!data.createdAt || !data.updatedAt) {
+          console.error('Lesson missing required date fields:', { createdAt: data.createdAt, updatedAt: data.updatedAt });
+          return null;
+        }
+
+        // Validate that dates are Firestore Timestamp objects
+        const hasValidCreatedAt = data.createdAt && data.createdAt.seconds && data.createdAt.nanoseconds;
+        const hasValidUpdatedAt = data.updatedAt && data.updatedAt.seconds && data.updatedAt.nanoseconds;
+        
+        if (!hasValidCreatedAt || !hasValidUpdatedAt) {
+          console.error('Invalid date format in lesson:', { 
+            createdAt: data.createdAt, 
+            updatedAt: data.updatedAt,
+            hasValidCreatedAt,
+            hasValidUpdatedAt
+          });
+          return null;
+        }
+
+        try {
+          // Create timestamp objects manually to avoid toDate() method issues
+          const createdAt = new Date(data.createdAt.seconds * 1000 + data.createdAt.nanoseconds / 1000000);
+          const updatedAt = new Date(data.updatedAt.seconds * 1000 + data.updatedAt.nanoseconds / 1000000);
+
+          // Clean the data to avoid issues with complex objects
+          const cleanData = { ...data };
+          delete cleanData.createdAt;
+          delete cleanData.updatedAt;
+
+          // Ensure audioUrl is a string (it might be causing the indexOf issue)
+          if (cleanData.audioUrl && typeof cleanData.audioUrl !== 'string') {
+            console.warn('audioUrl is not a string:', typeof cleanData.audioUrl, cleanData.audioUrl);
+            cleanData.audioUrl = String(cleanData.audioUrl);
+          }
+
+          return {
+            id: lessonDoc.id,
+            ...cleanData,
+            createdAt,
+            updatedAt
+          } as Lesson;
+        } catch (dateError) {
+          console.error('Error processing lesson:', dateError);
+          console.error('Error stack:', dateError.stack);
+          console.error('Data that caused error:', data);
+          // Return lesson with current date if date conversion fails
+          return {
+            id: lessonDoc.id,
+            name: data.name || '',
+            subjectId: data.subjectId || '',
+            userId: data.userId || '',
+            status: data.status || 'draft',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          } as Lesson;
+        }
       }
+      console.log('Lesson document does not exist:', lessonId);
       return null;
     } catch (error) {
       console.error('Error getting lesson:', error);
@@ -213,11 +285,11 @@ export class DataService {
       });
 
       // If completion status changed, update subject counts
-      if (updates.isCompleted !== undefined) {
+      if (updates.isCompleted !== undefined || updates.status !== undefined) {
         const lessonDoc = await getDoc(lessonRef);
-        const lesson = lessonDoc.data() as Lesson;
-        if (lesson) {
-          await this.updateSubjectLessonCount(lesson.subjectId);
+        const lessonData = lessonDoc.data();
+        if (lessonData && lessonData.subjectId) {
+          await this.updateSubjectLessonCount(lessonData.subjectId);
         }
       }
     } catch (error) {

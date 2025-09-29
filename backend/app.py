@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
@@ -13,7 +13,7 @@ from models import (
     QuizRequest,
     ChatRequest,
     ChatResponse,
-    ProcessedLesson
+    ProcessedChapter
 )
 
 # Load environment variables
@@ -84,9 +84,33 @@ async def get_processing_status(lesson_id: str):
     }
 
 @app.post("/api/transcribe")
-async def transcribe_audio(file: UploadFile = File(...), lesson_id: str = None):
+async def transcribe_audio(file: UploadFile = File(...), lesson_id: str = Form(None)):
     """Transcribe audio file to text using ElevenLabs Speech-to-Text (auto language)."""
     try:
+        # Validate file
+        if not file:
+            raise HTTPException(status_code=400, detail="No file provided")
+
+        # Check file size (ElevenLabs limit is typically 25MB)
+        content = await file.read()
+        file_size_mb = len(content) / (1024 * 1024)
+
+        if file_size_mb > 25:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File too large: {file_size_mb:.2f}MB. Maximum allowed is 25MB"
+            )
+
+        # Check file extension
+        allowed_extensions = ['.mp3', '.m4a', '.wav', '.flac', '.ogg', '.webm']
+        file_ext = os.path.splitext(file.filename or '')[1].lower()
+
+        if file_ext not in allowed_extensions:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file format: {file_ext}. Supported formats: {', '.join(allowed_extensions)}"
+            )
+
         # If lesson_id provided, update status
         if lesson_id:
             update_processing_status(
@@ -100,11 +124,26 @@ async def transcribe_audio(file: UploadFile = File(...), lesson_id: str = None):
         # Save uploaded file temporarily
         temp_path = f"temp_{file.filename}"
         with open(temp_path, "wb") as buffer:
-            content = await file.read()
             buffer.write(content)
 
-        # Transcribe audio (no modification to AI calls)
-        transcription = await ai_service.transcribe_audio(temp_path)
+        # Log file info for debugging
+        file_size = os.path.getsize(temp_path)
+        logger.info(f"Saved temp file: {temp_path} (size: {file_size} bytes)")
+        logger.info(f"Original filename: {file.filename}")
+        logger.info(f"Content length: {len(content)} bytes")
+
+        try:
+            # Transcribe audio
+            transcription = await ai_service.transcribe_audio(temp_path)
+        except Exception as transcription_error:
+            logger.error(f"ElevenLabs transcription failed: {str(transcription_error)}")
+            # Clean up temp file on error
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            raise HTTPException(
+                status_code=400,
+                detail=f"Transcription service error: {str(transcription_error)}"
+            )
 
         # Clean up temp file
         os.remove(temp_path)
@@ -121,6 +160,8 @@ async def transcribe_audio(file: UploadFile = File(...), lesson_id: str = None):
 
         return {"transcription": transcription}
 
+    except HTTPException:
+        raise
     except Exception as e:
         if lesson_id:
             update_processing_status(
@@ -132,7 +173,7 @@ async def transcribe_audio(file: UploadFile = File(...), lesson_id: str = None):
                 error=str(e)
             )
         logger.error(f"Transcription error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.post("/api/process-lesson")
 async def process_lesson(request: CourseGenerationRequest):

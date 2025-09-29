@@ -17,10 +17,10 @@ import { DataService } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
 
 interface RouteParams {
-  chapterId: string;
+  lessonId: string;
+  subjectId?: string;
   audioUrl?: string;
   documentText?: string;
-  lessonId: string;
   localUri?: string;
   fileName?: string;
   mimeType?: string;
@@ -75,7 +75,7 @@ export const ProcessingScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { user } = useAuth();
-  const { chapterId, audioUrl, documentText, lessonId, localUri, fileName, mimeType } = route.params as RouteParams;
+  const { lessonId, subjectId, audioUrl, documentText, localUri, fileName, mimeType } = route.params as RouteParams;
   
   const [currentStep, setCurrentStep] = useState(0);
   const [stepName, setStepName] = useState('Initialisation');
@@ -105,18 +105,13 @@ export const ProcessingScreen: React.FC = () => {
       }
 
       try {
-        // Get chapter, lesson, and subject info
-        const [chapter, lesson] = await Promise.all([
-          DataService.getChapter(chapterId),
-          DataService.getLesson(lessonId)
-        ]);
-        
-        if (!chapter || !lesson) {
-          throw new Error('Impossible de charger les informations du chapitre');
+        // Get lesson and subject info
+        const lesson = await DataService.getLesson(lessonId);
+        if (!lesson) {
+          throw new Error('Impossible de charger les informations de la leçon');
         }
-        
         const subjects = await DataService.getUserSubjects(user.uid);
-        const subject = subjects.find(s => s.id === lesson.subjectId);
+        const subject = subjects.find(s => s.id === (subjectId || lesson.subjectId));
         
         if (!subject) {
           throw new Error('Impossible de charger les informations de la matière');
@@ -140,7 +135,7 @@ export const ProcessingScreen: React.FC = () => {
         updateProgress((localUri || audioUrl) && !documentText ? 3 : 2, stepsCount, 'Génération du cours', 'Création du contenu structuré');
         const course = await AIService.generateCourse(
           transcriptionText,
-          chapter.name,
+          lesson.name,
           lesson.name,
           subject.name
         );
@@ -157,13 +152,13 @@ export const ProcessingScreen: React.FC = () => {
         updateProgress(stepsCount, stepsCount, 'Finalisation', 'Sauvegarde du contenu');
 
         // Persist results in Firebase
-        await DataService.updateChapter(chapterId, {
+        await DataService.updateLesson(lessonId, {
           transcription: transcriptionText,
           summary: course.summary,
           keyPoints: course.key_points,
           flashcards,
           quiz,
-          isProcessing: false,
+          status: 'completed',
           isCompleted: true,
         });
 
@@ -171,10 +166,12 @@ export const ProcessingScreen: React.FC = () => {
         
       } catch (error) {
         console.error('Processing error:', error);
-        setError(error.message || 'Erreur lors du traitement');
+        // @ts-ignore - runtime error type
+        setError((error && error.message) ? error.message : 'Erreur lors du traitement');
         Alert.alert(
           'Erreur de traitement',
-          error.message || 'Une erreur est survenue lors du traitement du contenu.',
+          // @ts-ignore - runtime error type
+          (error && error.message) ? error.message : 'Une erreur est survenue lors du traitement du contenu.',
           [
             { text: 'Réessayer', onPress: () => processContent() },
             { text: 'Annuler', onPress: () => navigation.goBack(), style: 'cancel' }
@@ -184,10 +181,10 @@ export const ProcessingScreen: React.FC = () => {
     };
 
     processContent();
-  }, [chapterId, audioUrl, documentText, lessonId, user]);
+  }, [audioUrl, documentText, lessonId, user]);
 
   const handleComplete = () => {
-    navigation.navigate('Chapter' as never, { chapterId } as never);
+    (navigation as any).navigate('Lesson', { lessonId });
   };
 
   const handleCancel = () => {

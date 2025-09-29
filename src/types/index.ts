@@ -36,6 +36,7 @@ export interface Lesson {
   status?: 'draft' | 'processing' | 'completed';
   progress?: number;
   duration?: number;
+  audioUrl?: string;
   isCompleted?: boolean;
   // Enhanced properties for display
   subjectName?: string;

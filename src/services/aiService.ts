@@ -61,7 +61,7 @@ export class AIService {
     audioUri: string,
     originalFileName?: string,
     originalMimeType?: string,
-    chapterId?: string
+    lessonId?: string
   ): Promise<string> {
     console.log('API_BASE_URL:', API_BASE_URL);
     console.log('Transcribing audio:', { audioUri, originalFileName, originalMimeType });
@@ -69,7 +69,7 @@ export class AIService {
     try {
       // Determine extension and mime type
       const inferExtFromMime = (mime?: string) => {
-        if (!mime) return 'm4a';
+        if (!mime) return 'wav';
         const map: Record<string, string> = {
           'audio/mpeg': 'mp3',
           'audio/mp3': 'mp3',
@@ -81,10 +81,10 @@ export class AIService {
           'audio/webm': 'webm',
           'audio/mp4': 'm4a',
         };
-        return map[mime] || 'm4a';
+        return map[mime] || 'wav';
       };
       const inferMimeFromExt = (ext?: string) => {
-        if (!ext) return 'audio/m4a';
+        if (!ext) return 'audio/wav';
         const map: Record<string, string> = {
           mp3: 'audio/mpeg',
           m4a: 'audio/x-m4a',
@@ -93,7 +93,7 @@ export class AIService {
           ogg: 'audio/ogg',
           webm: 'audio/webm',
         };
-        return map[ext] || 'audio/m4a';
+        return map[ext] || 'audio/wav';
       };
 
       const providedExt = originalFileName?.split('.')?.pop()?.toLowerCase();
@@ -112,9 +112,9 @@ export class AIService {
         type: mimeType,
       } as any);
       
-      // Add chapter_id if provided for progress tracking
-      if (chapterId) {
-        formData.append('chapter_id', chapterId);
+      // Add lesson_id if provided for progress tracking
+      if (lessonId) {
+        formData.append('lesson_id', lessonId);
       }
 
       const transcribeUrl = `${API_BASE_URL}/api/transcribe`;
@@ -156,6 +156,9 @@ export class AIService {
 
         const fallbackForm = new FormData();
         fallbackForm.append('file', blob as any, fileName);
+        if (lessonId) {
+          fallbackForm.append('lesson_id', lessonId);
+        }
 
         const resp = await fetch(`${API_BASE_URL}/api/transcribe`, {
           method: 'POST',
@@ -181,7 +184,7 @@ export class AIService {
     chapterId: string, 
     audioUrl?: string, 
     documentText?: string,
-    chapterInfo?: { chapter: Chapter; lesson: Lesson; subject: Subject },
+    chapterInfo?: { chapter: { name: string }; lesson: Lesson; subject: Subject },
     originalFileName?: string,
     originalMimeType?: string
   ): Promise<{
