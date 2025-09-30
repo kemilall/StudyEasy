@@ -82,12 +82,12 @@ export const AudioImportScreen: React.FC = () => {
     setIsUploading(true);
     
     try {
-      // 1. Create lesson and mark as processing
+      // 1. Create lesson and mark as draft
       const lessonId = await DataService.createLesson(user.uid, {
         subjectId,
         name: lessonName.trim(),
         duration: 0,
-        status: 'processing',
+        status: 'draft',
       });
 
       // 3. Upload audio file using the new FileUploadService
@@ -115,14 +115,14 @@ export const AudioImportScreen: React.FC = () => {
       await DataService.updateLesson(lessonId, { audioUrl });
 
       // 5. Navigate to processing screen for AI processing (include local file metadata)
-      navigation.navigate('ProcessingScreen' as never, {
+      (navigation as any).navigate('ProcessingScreen', {
         lessonId,
         subjectId,
         audioUrl,
         localUri: selectedFile.uri,
         fileName: selectedFile.name,
         mimeType: selectedFile.mimeType,
-      } as never);
+      });
 
     } catch (error) {
       console.error('Error uploading and processing audio:', error);

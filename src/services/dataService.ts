@@ -351,12 +351,14 @@ export class DataService {
     );
 
     return onSnapshot(q, (snapshot) => {
-      const lessons = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt.toDate(),
-        updatedAt: doc.data().updatedAt.toDate()
-      } as Lesson));
+      const lessons = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt.toDate(),
+          updatedAt: doc.data().updatedAt.toDate()
+        } as Lesson))
+        .filter(lesson => lesson.status !== 'draft'); // Exclure les drafts
       callback(lessons);
     });
   }
@@ -424,12 +426,14 @@ export class DataService {
     );
 
     return onSnapshot(q, async (snapshot) => {
-      const lessons = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt.toDate(),
-        updatedAt: doc.data().updatedAt.toDate()
-      } as Lesson));
+      const lessons = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt.toDate(),
+          updatedAt: doc.data().updatedAt.toDate()
+        } as Lesson))
+        .filter(lesson => lesson.status !== 'draft'); // Exclure les drafts
 
       // Enrich lessons with subject info
       const enrichedLessons = await Promise.all(

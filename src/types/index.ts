@@ -34,7 +34,7 @@ export interface Lesson {
   userId: string;
   createdAt: Date;
   updatedAt: Date;
-  status?: 'draft' | 'processing' | 'completed';
+  status?: 'draft' | 'completed';
   progress?: number;
   duration?: number;
   audioUrl?: string;

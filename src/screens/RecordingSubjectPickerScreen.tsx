@@ -15,6 +15,7 @@ import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { Subject } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { useRecording } from '../contexts/RecordingContext';
 import { DataService } from '../services/dataService';
 
 interface RouteParams {
@@ -25,6 +26,7 @@ export const RecordingSubjectPickerScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { user } = useAuth();
+  const { startRecording } = useRecording();
   const { initialLessonName } = (route.params as RouteParams) || {};
 
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -53,12 +55,20 @@ export const RecordingSubjectPickerScreen: React.FC = () => {
   const handleStartRecording = () => {
     if (!selectedSubject || !lessonName.trim()) return;
 
-    navigation.navigate('RecordingStudio' as never, {
+    // Start recording in context
+    startRecording(
+      selectedSubject.id,
+      selectedSubject.name,
+      lessonName.trim()
+    );
+
+    // Navigate directly to RecordingStudio
+    (navigation as any).navigate('RecordingStudio', {
       subjectId: selectedSubject.id,
       subjectName: selectedSubject.name,
       subjectColor: selectedSubject.color,
       initialLessonName: lessonName.trim(),
-    } as never);
+    });
   };
 
 
@@ -101,7 +111,7 @@ export const RecordingSubjectPickerScreen: React.FC = () => {
         </TouchableOpacity>
         <Text style={styles.title}>Nouvel enregistrement</Text>
         <TouchableOpacity
-          onPress={() => navigation.navigate('Drafts' as never)}
+          onPress={() => (navigation as any).navigate('Drafts')}
           style={styles.draftsButton}
         >
           <Ionicons name="document-outline" size={20} color={Colors.text.secondary} />

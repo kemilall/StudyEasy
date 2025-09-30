@@ -17,9 +17,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { useAuth } from '../contexts/AuthContext';
+import { useRecording } from '../contexts/RecordingContext';
 import { DataService } from '../services/dataService';
 import { RecordingDraft, RecordingSegment } from '../types';
 import { FileUploadService } from '../services/fileUploadService';
+import { RecordingExitModal } from '../components/RecordingExitModal';
+import { useRecordingNavigation } from '../hooks/useRecordingNavigation';
 
 interface RouteParams {
   subjectId: string;
@@ -37,6 +40,14 @@ export const RecordingStudioScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { user } = useAuth();
+  const { stopRecording, cancelRecording, saveAsDraft } = useRecording();
+  const {
+    showExitModal,
+    handleExitModalClose,
+    handleExitModalConfirm,
+    handleExitModalSaveDraft,
+    handleExitModalCancel,
+  } = useRecordingNavigation();
   const {
     subjectId,
     subjectName,
@@ -351,15 +362,15 @@ export const RecordingStudioScreen: React.FC = () => {
       );
 
       await DataService.updateLesson(lessonId, {
-        status: 'processing',
+        status: 'draft',
         audioUrl,
         duration: Math.floor(totalDurationMillis / 1000 / 60),
       });
 
       await cleanupLocalFiles();
 
-      // @ts-ignore - Navigation typing issue
-      navigation.navigate('ProcessingScreen', {
+      // Navigate to ProcessingScreen
+      (navigation as any).navigate('ProcessingScreen', {
         lessonId,
         audioUrl,
         localUri: audioUri,
@@ -458,6 +469,12 @@ export const RecordingStudioScreen: React.FC = () => {
           </View>
         )}
       </View>
+
+      {/* Exit Confirmation Modal */}
+      <RecordingExitModal
+        visible={showExitModal}
+        onClose={handleExitModalClose}
+      />
     </SafeAreaView>
   );
 };

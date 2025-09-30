@@ -41,7 +41,7 @@ export const LessonCard: React.FC<LessonCardProps> = ({ lesson, onPress, onDelet
               color={Colors.text.secondary}
             />
             <Text style={styles.infoText}>
-              {lesson.status === 'completed' ? 'Terminée' : lesson.status === 'processing' ? 'En cours' : 'Brouillon'}
+              {lesson.status === 'completed' ? 'Terminée' : 'Brouillon'}
             </Text>
           </View>
 

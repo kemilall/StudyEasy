@@ -24,6 +24,7 @@ import { DraftsScreen } from '../screens/DraftsScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { SignUpScreen } from '../screens/SignUpScreen';
 import { useAuth } from '../contexts/AuthContext';
+import { RecordingProvider } from '../contexts/RecordingContext';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 
@@ -193,7 +194,11 @@ export const AppNavigator: React.FC = () => {
 
   return (
     <NavigationContainer>
-      {user ? <AppStack /> : <AuthStack />}
+      {user ? (
+        <RecordingProvider>
+          <AppStack />
+        </RecordingProvider>
+      ) : <AuthStack />}
     </NavigationContainer>
   );
 };

@@ -95,7 +95,7 @@ export const LessonScreen: React.FC = () => {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {lesson.status === 'processing' ? (
+        {lesson.status === 'draft' ? (
           <View style={styles.processingCard}>
             <ActivityIndicator size="large" color={Colors.accent.blue} />
             <Text style={styles.processingTitle}>Traitement en cours...</Text>
