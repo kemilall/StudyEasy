@@ -135,65 +135,38 @@ const AppStack = () => {
       <Stack.Screen 
         name="Transcription" 
         component={TranscriptionScreen}
-        options={{
-          presentation: 'modal',
-        }}
       />
       <Stack.Screen 
         name="Flashcards" 
         component={FlashcardsScreen}
-        options={{
-          presentation: 'modal',
-        }}
       />
       <Stack.Screen 
         name="Quiz" 
         component={QuizScreen}
-        options={{
-          presentation: 'modal',
-        }}
       />
       <Stack.Screen 
         name="Chat" 
         component={ChatScreen}
-        options={{
-          presentation: 'modal',
-        }}
       />
       <Stack.Screen 
         name="AudioImport" 
         component={AudioImportScreen}
-        options={{
-          presentation: 'modal',
-        }}
       />
       <Stack.Screen
         name="RecordingSubjectPicker"
         component={RecordingSubjectPickerScreen}
-        options={{
-          presentation: 'modal',
-        }}
       />
       <Stack.Screen
         name="RecordingStudio"
         component={RecordingStudioScreen}
-        options={{
-          presentation: 'modal',
-        }}
       />
       <Stack.Screen 
         name="CreateSubject" 
         component={CreateSubjectScreen}
-        options={{
-          presentation: 'modal',
-        }}
       />
       <Stack.Screen 
         name="CreateLesson" 
         component={CreateLessonScreen}
-        options={{
-          presentation: 'modal',
-        }}
       />
       <Stack.Screen
         name="ProcessingScreen"
@@ -205,9 +178,6 @@ const AppStack = () => {
       <Stack.Screen
         name="Drafts"
         component={DraftsScreen}
-        options={{
-          presentation: 'modal',
-        }}
       />
     </Stack.Navigator>
   );

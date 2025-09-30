@@ -22,6 +22,8 @@ export const DraftsScreen: React.FC = () => {
   const { user } = useAuth();
   const [drafts, setDrafts] = useState<RecordingDraft[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedDrafts, setSelectedDrafts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) return;
@@ -35,14 +37,14 @@ export const DraftsScreen: React.FC = () => {
   }, [user]);
 
   const handleResumeDraft = (draft: RecordingDraft) => {
-    navigation.navigate('RecordingStudio' as never, {
+    (navigation as any).navigate('RecordingStudio', {
       subjectId: draft.subjectId,
       subjectName: draft.subjectName,
       subjectColor: draft.subjectColor,
       lessonId: draft.id,
       draftId: draft.id,
       initialLessonName: draft.lessonName,
-    } as never);
+    });
   };
 
   const handleDeleteDraft = (draft: RecordingDraft) => {
@@ -69,6 +71,61 @@ export const DraftsScreen: React.FC = () => {
     );
   };
 
+  const toggleSelectMode = () => {
+    setIsSelectMode(!isSelectMode);
+    setSelectedDrafts(new Set());
+  };
+
+  const toggleDraftSelection = (draftId: string) => {
+    const newSelected = new Set(selectedDrafts);
+    if (newSelected.has(draftId)) {
+      newSelected.delete(draftId);
+    } else {
+      newSelected.add(draftId);
+    }
+    setSelectedDrafts(newSelected);
+  };
+
+  const selectAllDrafts = () => {
+    if (selectedDrafts.size === drafts.length) {
+      setSelectedDrafts(new Set());
+    } else {
+      setSelectedDrafts(new Set(drafts.map(d => d.id)));
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedDrafts.size === 0) return;
+
+    Alert.alert(
+      'Supprimer les brouillons',
+      `Êtes-vous sûr de vouloir supprimer ${selectedDrafts.size} brouillon(s) ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (user) {
+                await Promise.all(
+                  Array.from(selectedDrafts).map(draftId =>
+                    DataService.deleteRecordingDraft(user.uid, draftId)
+                  )
+                );
+                setSelectedDrafts(new Set());
+                setIsSelectMode(false);
+              }
+            } catch (error) {
+              console.error('Error deleting drafts:', error);
+              Alert.alert('Erreur', 'Impossible de supprimer les brouillons');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const formatDuration = (millis: number) => {
     const totalSeconds = Math.floor(millis / 1000);
     const hours = Math.floor(totalSeconds / 3600);
@@ -81,54 +138,70 @@ export const DraftsScreen: React.FC = () => {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const renderDraft = ({ item }: { item: RecordingDraft }) => (
-    <TouchableOpacity
-      style={styles.draftCard}
-      onPress={() => handleResumeDraft(item)}
-    >
-      <View style={styles.draftHeader}>
-        <View style={styles.draftInfo}>
-          <View style={[styles.subjectBadge, { backgroundColor: (item.subjectColor || Colors.accent.blue) + '20' }]}>
-            <Text style={[styles.subjectBadgeText, { color: item.subjectColor || Colors.accent.blue }]}>
-              {item.subjectName}
+  const renderDraft = ({ item }: { item: RecordingDraft }) => {
+    const isSelected = selectedDrafts.has(item.id);
+
+    return (
+      <TouchableOpacity
+        style={[styles.draftCard, isSelected && styles.draftCardSelected]}
+        onPress={() => isSelectMode ? toggleDraftSelection(item.id) : handleResumeDraft(item)}
+      >
+        {isSelectMode && (
+          <View style={styles.checkbox}>
+            <View style={[styles.checkboxInner, isSelected && styles.checkboxSelected]}>
+              {isSelected && <Ionicons name="checkmark" size={16} color={Colors.surface} />}
+            </View>
+          </View>
+        )}
+
+        <View style={styles.draftHeader}>
+          <View style={styles.draftInfo}>
+            <View style={[styles.subjectBadge, { backgroundColor: (item.subjectColor || Colors.accent.blue) + '20' }]}>
+              <Text style={[styles.subjectBadgeText, { color: item.subjectColor || Colors.accent.blue }]}>
+                {item.subjectName}
+              </Text>
+            </View>
+            <Text style={styles.draftTitle} numberOfLines={1}>{item.lessonName}</Text>
+          </View>
+          {!isSelectMode && (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => handleDeleteDraft(item)}
+            >
+              <Ionicons name="trash-outline" size={20} color={Colors.text.tertiary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.draftDetails}>
+          <View style={styles.draftMeta}>
+            <Ionicons name="time-outline" size={16} color={Colors.text.tertiary} />
+            <Text style={styles.draftMetaText}>
+              {formatDuration(item.durationMillis)}
             </Text>
           </View>
-          <Text style={styles.draftTitle} numberOfLines={1}>{item.lessonName}</Text>
+          <View style={styles.draftMeta}>
+            <Ionicons name="calendar-outline" size={16} color={Colors.text.tertiary} />
+            <Text style={styles.draftMetaText}>
+              {new Date(item.updatedAt).toLocaleDateString('fr-FR')}
+            </Text>
+          </View>
         </View>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleDeleteDraft(item)}
-        >
-          <Ionicons name="trash-outline" size={20} color={Colors.text.tertiary} />
-        </TouchableOpacity>
-      </View>
 
-      <View style={styles.draftDetails}>
-        <View style={styles.draftMeta}>
-          <Ionicons name="time-outline" size={16} color={Colors.text.tertiary} />
-          <Text style={styles.draftMetaText}>
-            {formatDuration(item.durationMillis)}
-          </Text>
-        </View>
-        <View style={styles.draftMeta}>
-          <Ionicons name="calendar-outline" size={16} color={Colors.text.tertiary} />
-          <Text style={styles.draftMetaText}>
-            {new Date(item.updatedAt).toLocaleDateString('fr-FR')}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.draftActions}>
-        <TouchableOpacity
-          style={styles.resumeButton}
-          onPress={() => handleResumeDraft(item)}
-        >
-          <Ionicons name="play-circle" size={20} color={Colors.surface} />
-          <Text style={styles.resumeButtonText}>Reprendre</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+        {!isSelectMode && (
+          <View style={styles.draftActions}>
+            <TouchableOpacity
+              style={styles.resumeButton}
+              onPress={() => handleResumeDraft(item)}
+            >
+              <Ionicons name="play-circle" size={20} color={Colors.surface} />
+              <Text style={styles.resumeButtonText}>Reprendre</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -149,9 +222,52 @@ export const DraftsScreen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.title}>Brouillons</Text>
-        <View style={styles.placeholder} />
+        <Text style={styles.title}>
+          {isSelectMode ? `${selectedDrafts.size} sélectionné(s)` : 'Brouillons'}
+        </Text>
+        <TouchableOpacity
+          onPress={toggleSelectMode}
+          style={styles.selectButton}
+        >
+          <Text style={styles.selectButtonText}>
+            {isSelectMode ? 'Annuler' : 'Sélectionner'}
+          </Text>
+        </TouchableOpacity>
       </View>
+
+      {isSelectMode && drafts.length > 0 && (
+        <View style={styles.selectionToolbar}>
+          <TouchableOpacity
+            onPress={selectAllDrafts}
+            style={styles.toolbarButton}
+          >
+            <Ionicons 
+              name={selectedDrafts.size === drafts.length ? "checkbox" : "square-outline"} 
+              size={20} 
+              color={Colors.accent.blue} 
+            />
+            <Text style={styles.toolbarButtonText}>Tout sélectionner</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleDeleteSelected}
+            style={[styles.toolbarButton, styles.deleteToolbarButton]}
+            disabled={selectedDrafts.size === 0}
+          >
+            <Ionicons 
+              name="trash-outline" 
+              size={20} 
+              color={selectedDrafts.size === 0 ? Colors.text.tertiary : Colors.accent.red} 
+            />
+            <Text style={[
+              styles.toolbarButtonText,
+              { color: selectedDrafts.size === 0 ? Colors.text.tertiary : Colors.accent.red }
+            ]}>
+              Supprimer ({selectedDrafts.size})
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {drafts.length === 0 ? (
         <View style={styles.emptyContainer}>
@@ -305,5 +421,63 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     textAlign: 'center',
     lineHeight: 24,
+  },
+  selectButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  selectButtonText: {
+    ...Typography.subheadline,
+    color: Colors.accent.blue,
+    fontWeight: '600',
+  },
+  selectionToolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray[200],
+  },
+  toolbarButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  deleteToolbarButton: {
+    opacity: 1,
+  },
+  toolbarButtonText: {
+    ...Typography.subheadline,
+    color: Colors.accent.blue,
+    fontWeight: '600',
+  },
+  checkbox: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    zIndex: 10,
+  },
+  checkboxInner: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: Colors.gray[300],
+    backgroundColor: Colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxSelected: {
+    backgroundColor: Colors.accent.blue,
+    borderColor: Colors.accent.blue,
+  },
+  draftCardSelected: {
+    borderColor: Colors.accent.blue,
+    borderWidth: 2,
   },
 });

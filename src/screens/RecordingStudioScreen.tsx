@@ -382,7 +382,7 @@ export const RecordingStudioScreen: React.FC = () => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="close" size={28} color={Colors.text.primary} />
+          <Ionicons name="arrow-back" size={28} color={Colors.text.primary} />
         </TouchableOpacity>
         
         <View style={styles.headerTitle}>

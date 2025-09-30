@@ -197,7 +197,7 @@ export const ProcessingScreen: React.FC = () => {
           onPress={handleCancel}
           style={styles.cancelButton}
         >
-          <Ionicons name="close" size={24} color={Colors.text.primary} />
+          <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.title}>Traitement en cours</Text>
         <View style={styles.placeholder} />

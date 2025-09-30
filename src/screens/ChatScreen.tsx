@@ -148,7 +148,7 @@ ${lesson.keyPoints ? `Points clés: ${lesson.keyPoints.join(', ')}` : ''}
           onPress={() => navigation.goBack()}
           style={styles.closeButton}
         >
-          <Ionicons name="close" size={24} color={Colors.text.primary} />
+          <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
         
         <View style={styles.headerTitle}>

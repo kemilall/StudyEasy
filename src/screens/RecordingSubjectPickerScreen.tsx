@@ -97,7 +97,7 @@ export const RecordingSubjectPickerScreen: React.FC = () => {
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <Ionicons name="close" size={24} color={Colors.text.primary} />
+          <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.title}>Nouvel enregistrement</Text>
         <TouchableOpacity
@@ -150,7 +150,10 @@ export const RecordingSubjectPickerScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Start Recording Button */}
+      </View>
+
+      {/* Start Recording Button */}
+      <View style={styles.bottomContainer}>
         <TouchableOpacity
           style={[
             styles.startButton,
@@ -203,6 +206,10 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 24,
+  },
+  bottomContainer: {
+    padding: 24,
+    paddingTop: 0,
   },
   section: {
     marginBottom: 32,
@@ -288,10 +295,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    position: 'absolute',
-    bottom: 24,
-    left: 24,
-    right: 24,
   },
   startButtonDisabled: {
     backgroundColor: Colors.gray[400],
