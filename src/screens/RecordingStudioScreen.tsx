@@ -175,21 +175,13 @@ export const RecordingStudioScreen: React.FC = () => {
 
   const startRecording = async () => {
     try {
+      // Capturer l'état de pause AVANT de le modifier
+      const wasResuming = recording && isPaused;
+
       // Feedback visuel immédiat
       setIsRecording(true);
       setIsPaused(false);
       setShowResumeValidate(false);
-
-      // Create lesson if needed
-      if (!lessonId && user) {
-        const newLessonId = await DataService.createLesson(user.uid, {
-          subjectId,
-          name: lessonNameRef.current,
-          status: 'draft',
-          duration: 0,
-        });
-        setLessonId(newLessonId);
-      }
 
       // Configure audio mode
       await Audio.setAudioModeAsync({
@@ -224,8 +216,8 @@ export const RecordingStudioScreen: React.FC = () => {
       };
 
       // If resuming, resume the existing recording
-      if (recording && isPaused) {
-        await recording.startAsync();
+      if (wasResuming) {
+        await recording!.startAsync();
       } else {
         // Create new recording
         const { recording: newRecording } = await Audio.Recording.createAsync(
@@ -245,6 +237,22 @@ export const RecordingStudioScreen: React.FC = () => {
         autoSaveInterval.current = setInterval(() => {
           saveDraft();
         }, AUTOSAVE_INTERVAL);
+      }
+
+      // Create lesson in background if needed (non-blocking)
+      if (!lessonId && user) {
+        DataService.createLesson(user.uid, {
+          subjectId,
+          name: lessonNameRef.current,
+          status: 'draft',
+          duration: 0,
+        })
+          .then((newLessonId) => {
+            setLessonId(newLessonId);
+          })
+          .catch((error) => {
+            console.error('Failed to create lesson:', error);
+          });
       }
 
     } catch (error) {
@@ -287,6 +295,16 @@ export const RecordingStudioScreen: React.FC = () => {
     if (!recording) return;
 
     try {
+      // Wait for lesson creation if still in progress
+      if (!lessonId) {
+        Alert.alert(
+          'Préparation en cours',
+          'Veuillez patienter un instant...',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
       // Final stop and get the recording
       await recording.stopAndUnloadAsync();
       const uri = recording.getURI();

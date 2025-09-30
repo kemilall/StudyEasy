@@ -171,9 +171,6 @@ const AppStack = () => {
       <Stack.Screen
         name="ProcessingScreen"
         component={ProcessingScreen}
-        options={{
-          presentation: 'fullScreenModal',
-        }}
       />
       <Stack.Screen
         name="Drafts"

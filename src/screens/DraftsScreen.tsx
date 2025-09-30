@@ -146,59 +146,66 @@ export const DraftsScreen: React.FC = () => {
         style={[styles.draftCard, isSelected && styles.draftCardSelected]}
         onPress={() => isSelectMode ? toggleDraftSelection(item.id) : handleResumeDraft(item)}
       >
-        {isSelectMode && (
-          <View style={styles.checkbox}>
-            <View style={[styles.checkboxInner, isSelected && styles.checkboxSelected]}>
-              {isSelected && <Ionicons name="checkmark" size={16} color={Colors.surface} />}
+        <View style={[styles.draftContent, isSelectMode && styles.draftContentWithCheckbox]}>
+          {isSelectMode && (
+            <View style={styles.checkboxContainer}>
+              <View style={[styles.checkboxInner, isSelected && styles.checkboxSelected]}>
+                {isSelected && <Ionicons name="checkmark" size={16} color={Colors.surface} />}
+              </View>
             </View>
-          </View>
-        )}
-
-        <View style={styles.draftHeader}>
-          <View style={styles.draftInfo}>
-            <View style={[styles.subjectBadge, { backgroundColor: (item.subjectColor || Colors.accent.blue) + '20' }]}>
-              <Text style={[styles.subjectBadgeText, { color: item.subjectColor || Colors.accent.blue }]}>
-                {item.subjectName}
-              </Text>
-            </View>
-            <Text style={styles.draftTitle} numberOfLines={1}>{item.lessonName}</Text>
-          </View>
-          {!isSelectMode && (
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={() => handleDeleteDraft(item)}
-            >
-              <Ionicons name="trash-outline" size={20} color={Colors.text.tertiary} />
-            </TouchableOpacity>
           )}
-        </View>
 
-        <View style={styles.draftDetails}>
-          <View style={styles.draftMeta}>
-            <Ionicons name="time-outline" size={16} color={Colors.text.tertiary} />
-            <Text style={styles.draftMetaText}>
-              {formatDuration(item.durationMillis)}
-            </Text>
-          </View>
-          <View style={styles.draftMeta}>
-            <Ionicons name="calendar-outline" size={16} color={Colors.text.tertiary} />
-            <Text style={styles.draftMetaText}>
-              {new Date(item.updatedAt).toLocaleDateString('fr-FR')}
-            </Text>
+          <View style={styles.draftMain}>
+            <View style={styles.draftHeader}>
+              <View style={styles.draftInfo}>
+                <View style={[styles.subjectBadge, { backgroundColor: (item.subjectColor || Colors.accent.blue) + '20' }]}>
+                  <Text style={[styles.subjectBadgeText, { color: item.subjectColor || Colors.accent.blue }]}>
+                    {item.subjectName}
+                  </Text>
+                </View>
+                <Text style={styles.draftTitle} numberOfLines={2}>{item.lessonName}</Text>
+              </View>
+              {!isSelectMode && (
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleDeleteDraft(item);
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={20} color={Colors.text.tertiary} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={styles.draftDetails}>
+              <View style={styles.draftMeta}>
+                <Ionicons name="time-outline" size={14} color={Colors.text.tertiary} />
+                <Text style={styles.draftMetaText}>
+                  {formatDuration(item.durationMillis)}
+                </Text>
+              </View>
+              <View style={styles.draftMeta}>
+                <Ionicons name="calendar-outline" size={14} color={Colors.text.tertiary} />
+                <Text style={styles.draftMetaText}>
+                  {new Date(item.updatedAt).toLocaleDateString('fr-FR')}
+                </Text>
+              </View>
+            </View>
+
+            {!isSelectMode && (
+              <View style={styles.draftActions}>
+                <TouchableOpacity
+                  style={styles.resumeButton}
+                  onPress={() => handleResumeDraft(item)}
+                >
+                  <Ionicons name="play-circle" size={18} color={Colors.surface} />
+                  <Text style={styles.resumeButtonText}>Reprendre</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
-
-        {!isSelectMode && (
-          <View style={styles.draftActions}>
-            <TouchableOpacity
-              style={styles.resumeButton}
-              onPress={() => handleResumeDraft(item)}
-            >
-              <Ionicons name="play-circle" size={20} color={Colors.surface} />
-              <Text style={styles.resumeButtonText}>Reprendre</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </TouchableOpacity>
     );
   };
@@ -229,9 +236,11 @@ export const DraftsScreen: React.FC = () => {
           onPress={toggleSelectMode}
           style={styles.selectButton}
         >
-          <Text style={styles.selectButtonText}>
-            {isSelectMode ? 'Annuler' : 'Sélectionner'}
-          </Text>
+          {isSelectMode ? (
+            <Text style={styles.selectButtonText}>Annuler</Text>
+          ) : (
+            <Ionicons name="ellipsis-horizontal" size={24} color={Colors.text.primary} />
+          )}
         </TouchableOpacity>
       </View>
 
@@ -303,21 +312,30 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: Colors.gray[200],
+    position: 'relative',
   },
   backButton: {
+    position: 'absolute',
+    left: 20,
     width: 40,
     height: 40,
     justifyContent: 'center',
   },
   title: {
-    ...Typography.largeTitle,
+    ...Typography.headline,
     color: Colors.text.primary,
-    fontWeight: '800',
+    fontWeight: '600',
+  },
+  selectButton: {
+    position: 'absolute',
+    right: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   placeholder: {
     width: 40,
@@ -329,7 +347,6 @@ const styles = StyleSheet.create({
   draftCard: {
     backgroundColor: Colors.surface,
     borderRadius: 16,
-    padding: 20,
     borderWidth: 1,
     borderColor: Colors.gray[200],
     shadowColor: Colors.card.shadow,
@@ -338,21 +355,35 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+  draftContent: {
+    flexDirection: 'row',
+    padding: 16,
+  },
+  draftContentWithCheckbox: {
+    paddingLeft: 12,
+  },
+  checkboxContainer: {
+    paddingTop: 2,
+    marginRight: 12,
+  },
+  draftMain: {
+    flex: 1,
+  },
   draftHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   draftInfo: {
     flex: 1,
   },
   subjectBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 6,
     alignSelf: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   subjectBadgeText: {
     ...Typography.caption2,
@@ -361,18 +392,19 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   draftTitle: {
-    ...Typography.headline,
+    ...Typography.subheadline,
     color: Colors.text.primary,
-    fontWeight: '700',
-    lineHeight: 24,
+    fontWeight: '600',
+    lineHeight: 20,
   },
   deleteButton: {
     padding: 4,
+    marginLeft: 8,
   },
   draftDetails: {
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 16,
+    gap: 12,
+    marginBottom: 12,
   },
   draftMeta: {
     flexDirection: 'row',
@@ -386,20 +418,20 @@ const styles = StyleSheet.create({
   draftActions: {
     borderTopWidth: 1,
     borderTopColor: Colors.gray[100],
-    paddingTop: 16,
+    paddingTop: 12,
   },
   resumeButton: {
     backgroundColor: Colors.accent.blue,
     borderRadius: 12,
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
   },
   resumeButtonText: {
-    ...Typography.subheadline,
+    ...Typography.callout,
     color: Colors.surface,
     fontWeight: '600',
   },
@@ -421,10 +453,6 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     textAlign: 'center',
     lineHeight: 24,
-  },
-  selectButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
   },
   selectButtonText: {
     ...Typography.subheadline,
@@ -456,16 +484,10 @@ const styles = StyleSheet.create({
     color: Colors.accent.blue,
     fontWeight: '600',
   },
-  checkbox: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    zIndex: 10,
-  },
   checkboxInner: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     borderWidth: 2,
     borderColor: Colors.gray[300],
     backgroundColor: Colors.surface,
