@@ -80,11 +80,17 @@ export const HomeScreen: React.FC = () => {
 
     return (
       <TouchableOpacity
-        style={styles.subjectCard}
+        style={[styles.subjectCard, item.isDeleting && styles.subjectCardDeleting]}
         activeOpacity={0.7}
         onPress={() => navigation.navigate('Subjects', { screen: 'Subject', params: { subjectId: item.id } })}
+        disabled={item.isDeleting}
       >
-        <View style={styles.subjectCardContent}>
+        {item.isDeleting && (
+          <View style={styles.subjectLoadingOverlay}>
+            <ActivityIndicator size="small" color={item.color} />
+          </View>
+        )}
+        <View style={[styles.subjectCardContent, item.isDeleting && styles.fadedContent]}>
           <Ionicons 
             name={getSubjectIcon(item) as any} 
             size={24} 
@@ -565,5 +571,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 24,
+  },
+  subjectCardDeleting: {
+    opacity: 0.9,
+  },
+  subjectLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  fadedContent: {
+    opacity: 0.3,
   },
 });

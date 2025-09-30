@@ -93,7 +93,7 @@ export const DoubleConfirmationModal: React.FC<DoubleConfirmationModalProps> = (
                   onPress={handleFirstConfirm}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.warningText}>Continuer</Text>
+                  <Text style={styles.warningText}>Supprimer</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -116,7 +116,7 @@ export const DoubleConfirmationModal: React.FC<DoubleConfirmationModalProps> = (
                 >
                   <Text style={styles.cancelText}>{cancelText}</Text>
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
                   style={[styles.button, styles.confirmButton]}
                   onPress={handleFinalConfirm}
@@ -202,14 +202,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: 48,
   },
-  cancelButton: {
-    backgroundColor: Colors.gray[100],
-  },
   warningButton: {
     backgroundColor: Colors.accent.orange,
   },
   confirmButton: {
     backgroundColor: Colors.accent.red,
+  },
+  cancelButton: {
+    backgroundColor: Colors.gray[100],
   },
   cancelText: {
     ...Typography.subheadline,

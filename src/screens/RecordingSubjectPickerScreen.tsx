@@ -13,7 +13,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
-import { Subject, RecordingDraft } from '../types';
+import { Subject } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { DataService } from '../services/dataService';
 
@@ -28,9 +28,7 @@ export const RecordingSubjectPickerScreen: React.FC = () => {
   const { initialLessonName } = (route.params as RouteParams) || {};
 
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [recordingDrafts, setRecordingDrafts] = useState<RecordingDraft[]>([]);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
-  const [isLoadingDrafts, setIsLoadingDrafts] = useState(true);
   const [lessonName, setLessonName] = useState(initialLessonName || '');
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
 
@@ -43,15 +41,8 @@ export const RecordingSubjectPickerScreen: React.FC = () => {
       setIsLoadingSubjects(false);
     });
 
-    // Subscribe to recording drafts
-    const unsubscribeDrafts = DataService.subscribeToRecordingDrafts(user.uid, (drafts) => {
-      setRecordingDrafts(drafts);
-      setIsLoadingDrafts(false);
-    });
-
     return () => {
       unsubscribeSubjects();
-      unsubscribeDrafts();
     };
   }, [user]);
 
@@ -70,16 +61,6 @@ export const RecordingSubjectPickerScreen: React.FC = () => {
     } as never);
   };
 
-  const handleResumeDraft = (draft: RecordingDraft) => {
-    navigation.navigate('RecordingStudio' as never, {
-      subjectId: draft.subjectId,
-      subjectName: draft.subjectName,
-      subjectColor: draft.subjectColor,
-      lessonId: draft.id,
-      draftId: draft.id,
-      initialLessonName: draft.lessonName,
-    } as never);
-  };
 
   const renderSubject = ({ item }: { item: Subject }) => {
     const isSelected = selectedSubject?.id === item.id;
@@ -108,63 +89,26 @@ export const RecordingSubjectPickerScreen: React.FC = () => {
     );
   };
 
-  const renderDraft = ({ item }: { item: RecordingDraft }) => {
-    const duration = Math.floor(item.durationMillis / 1000);
-    const minutes = Math.floor(duration / 60);
-    const seconds = duration % 60;
-    
-    return (
-      <TouchableOpacity
-        style={styles.draftCard}
-        onPress={() => handleResumeDraft(item)}
-      >
-        <View style={[styles.draftIcon, { backgroundColor: (item.subjectColor || Colors.accent.blue) + '20' }]}>
-          <Ionicons name="mic" size={20} color={item.subjectColor || Colors.accent.blue} />
-        </View>
-        <View style={styles.draftContent}>
-          <Text style={styles.draftTitle} numberOfLines={1}>{item.lessonName}</Text>
-          <Text style={styles.draftSubtitle}>
-            {item.subjectName} • {minutes}:{seconds.toString().padStart(2, '0')}
-          </Text>
-        </View>
-        <Ionicons name="play-circle" size={24} color={Colors.accent.blue} />
-      </TouchableOpacity>
-    );
-  };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
           <Ionicons name="close" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.title}>Nouvel enregistrement</Text>
-        <View style={styles.placeholder} />
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Drafts' as never)}
+          style={styles.draftsButton}
+        >
+          <Ionicons name="document-outline" size={20} color={Colors.text.secondary} />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.content}>
-        {/* Recording Drafts */}
-        {recordingDrafts.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Brouillons</Text>
-            {isLoadingDrafts ? (
-              <ActivityIndicator size="small" color={Colors.accent.blue} />
-            ) : (
-              <FlatList
-                data={recordingDrafts}
-                renderItem={renderDraft}
-                keyExtractor={(item) => item.id}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.draftsList}
-              />
-            )}
-          </View>
-        )}
-
         {/* Lesson Name Input */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Nom de la leçon</Text>
@@ -249,6 +193,13 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 40,
   },
+  draftsButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+  },
   content: {
     flex: 1,
     padding: 24,
@@ -260,40 +211,6 @@ const styles = StyleSheet.create({
     ...Typography.title3,
     color: Colors.text.primary,
     marginBottom: 16,
-  },
-  draftsList: {
-    gap: 12,
-  },
-  draftCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 16,
-    marginRight: 12,
-    width: 280,
-    borderWidth: 1,
-    borderColor: Colors.gray[200],
-  },
-  draftIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  draftContent: {
-    flex: 1,
-  },
-  draftTitle: {
-    ...Typography.headline,
-    color: Colors.text.primary,
-    marginBottom: 2,
-  },
-  draftSubtitle: {
-    ...Typography.caption1,
-    color: Colors.text.secondary,
   },
   input: {
     backgroundColor: Colors.surface,

@@ -20,6 +20,7 @@ import { CreateLessonScreen } from '../screens/CreateLessonScreen';
 import { ProcessingScreen } from '../screens/ProcessingScreen';
 import { RecordingSubjectPickerScreen } from '../screens/RecordingSubjectPickerScreen';
 import { RecordingStudioScreen } from '../screens/RecordingStudioScreen';
+import { DraftsScreen } from '../screens/DraftsScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { SignUpScreen } from '../screens/SignUpScreen';
 import { useAuth } from '../contexts/AuthContext';
@@ -194,11 +195,18 @@ const AppStack = () => {
           presentation: 'modal',
         }}
       />
-      <Stack.Screen 
-        name="ProcessingScreen" 
+      <Stack.Screen
+        name="ProcessingScreen"
         component={ProcessingScreen}
         options={{
           presentation: 'fullScreenModal',
+        }}
+      />
+      <Stack.Screen
+        name="Drafts"
+        component={DraftsScreen}
+        options={{
+          presentation: 'modal',
         }}
       />
     </Stack.Navigator>

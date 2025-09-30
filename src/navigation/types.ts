@@ -17,6 +17,7 @@ export type RootStackParamList = {
     draftId?: string;
     initialLessonName?: string;
   };
+  Drafts: undefined;
   CreateSubject: undefined;
   CreateLesson: { subjectId?: string };
   ProcessingScreen: {

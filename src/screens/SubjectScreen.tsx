@@ -8,6 +8,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Modal,
+  TextInput,
+  Pressable,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +20,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { DataService } from '../services/dataService';
 import { Subject, Lesson } from '../types';
 import { LessonCard } from '../components/LessonCard';
+import { DoubleConfirmationModal } from '../components/DoubleConfirmationModal';
 
 export const SubjectScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -28,6 +32,10 @@ export const SubjectScreen: React.FC = () => {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [recentLessons, setRecentLessons] = useState<Lesson[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [newSubjectName, setNewSubjectName] = useState('');
 
   useEffect(() => {
     if (!user || !subjectId) return;
@@ -88,6 +96,38 @@ export const SubjectScreen: React.FC = () => {
     }
   };
 
+  const handleRenameSubject = async () => {
+    if (!subject || !newSubjectName.trim()) return;
+
+    try {
+      await DataService.updateSubject(subject.id, { name: newSubjectName.trim() });
+      setShowRenameModal(false);
+      setNewSubjectName('');
+    } catch (error) {
+      console.error('Error renaming subject:', error);
+      Alert.alert('Erreur', 'Impossible de renommer la matière. Veuillez réessayer.');
+    }
+  };
+
+  const handleDeleteSubject = async () => {
+    if (!subject) return;
+
+    try {
+      // Fermer le modal et retourner immédiatement pour masquer l'UI
+      setShowDeleteModal(false);
+      navigation.goBack();
+      
+      // Supprimer en arrière-plan (async sans await)
+      DataService.deleteSubject(subject.id).catch(error => {
+        console.error('Error deleting subject:', error);
+        Alert.alert('Erreur', 'Impossible de supprimer la matière. Veuillez réessayer.');
+      });
+    } catch (error) {
+      console.error('Error deleting subject:', error);
+      Alert.alert('Erreur', 'Impossible de supprimer la matière. Veuillez réessayer.');
+    }
+  };
+
   const renderLesson = (lesson: Lesson) => (
     <LessonCard
       key={lesson.id}
@@ -128,19 +168,19 @@ export const SubjectScreen: React.FC = () => {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => navigation.goBack()}
             style={styles.backButton}
           >
             <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
           </TouchableOpacity>
-          
+
           <View style={styles.headerContent}>
             <View style={[styles.subjectIcon, { backgroundColor: subject.color + '15' }]}>
-              <Ionicons 
-                name={getSubjectIcon(subject.name) as any} 
-                size={40} 
-                color={subject.color} 
+              <Ionicons
+                name={getSubjectIcon(subject.name) as any}
+                size={40}
+                color={subject.color}
               />
             </View>
             <Text style={styles.subjectName}>{subject.name}</Text>
@@ -163,6 +203,13 @@ export const SubjectScreen: React.FC = () => {
               </View>
             </View>
           </View>
+
+          <TouchableOpacity
+            onPress={() => setShowMenu(true)}
+            style={styles.menuButton}
+          >
+            <Ionicons name="ellipsis-vertical" size={24} color={Colors.text.primary} />
+          </TouchableOpacity>
         </View>
 
         {/* Recent Lessons */}
@@ -225,6 +272,90 @@ export const SubjectScreen: React.FC = () => {
           )}
         </View>
       </ScrollView>
+
+      {/* Menu Modal */}
+      <Modal
+        visible={showMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setShowMenu(false)}>
+          <View style={styles.menuModal}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowMenu(false);
+                setNewSubjectName(subject?.name || '');
+                setShowRenameModal(true);
+              }}
+            >
+              <Ionicons name="create-outline" size={20} color={Colors.text.primary} />
+              <Text style={styles.menuItemText}>Renommer</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowMenu(false);
+                setShowDeleteModal(true);
+              }}
+            >
+              <Ionicons name="trash-outline" size={20} color={Colors.accent.red} />
+              <Text style={[styles.menuItemText, styles.deleteText]}>Supprimer</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Rename Modal */}
+      <Modal
+        visible={showRenameModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowRenameModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable style={styles.backdrop} onPress={() => setShowRenameModal(false)} />
+          <View style={styles.renameModal}>
+            <Text style={styles.modalTitle}>Renommer la matière</Text>
+            <TextInput
+              style={styles.renameInput}
+              value={newSubjectName}
+              onChangeText={setNewSubjectName}
+              placeholder="Nom de la matière"
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowRenameModal(false);
+                  setNewSubjectName('');
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={handleRenameSubject}
+              >
+                <Text style={styles.confirmButtonText}>Renommer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <DoubleConfirmationModal
+        visible={showDeleteModal}
+        title="Supprimer la matière"
+        message={`Êtes-vous sûr de vouloir supprimer "${subject?.name}" ?`}
+        warningMessage={`Cette action supprimera la matière "${subject?.name}" et toutes ses leçons. Cette action ne peut pas être annulée.`}
+        confirmText="Supprimer"
+        onConfirm={handleDeleteSubject}
+        onCancel={() => setShowDeleteModal(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -480,5 +611,113 @@ const styles = StyleSheet.create({
     ...Typography.subheadline,
     color: Colors.surface,
     fontWeight: '700',
+  },
+  // Menu styles
+  menuButton: {
+    position: 'absolute',
+    top: 16,
+    right: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'flex-start',
+  },
+  menuModal: {
+    position: 'absolute',
+    top: 70,
+    right: 20,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 8,
+    minWidth: 180,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    gap: 12,
+  },
+  menuItemText: {
+    ...Typography.subheadline,
+    color: Colors.text.primary,
+    fontWeight: '600',
+  },
+  deleteText: {
+    color: Colors.accent.red,
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  renameModal: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 24,
+    marginHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalTitle: {
+    ...Typography.title2,
+    color: Colors.text.primary,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  renameInput: {
+    backgroundColor: Colors.gray[100],
+    borderRadius: 12,
+    padding: 16,
+    ...Typography.body,
+    color: Colors.text.primary,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    marginBottom: 24,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 48,
+  },
+  cancelButton: {
+    backgroundColor: Colors.gray[100],
+  },
+  confirmButton: {
+    backgroundColor: Colors.accent.blue,
+  },
+  cancelButtonText: {
+    ...Typography.subheadline,
+    color: Colors.text.secondary,
+    fontWeight: '600',
+  },
+  confirmButtonText: {
+    ...Typography.subheadline,
+    color: Colors.surface,
+    fontWeight: '600',
   },
 });

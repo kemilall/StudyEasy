@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Subject } from '../types';
 import { Colors } from '../constants/colors';
@@ -37,11 +37,19 @@ export const SubjectCard: React.FC<SubjectCardProps> = ({ subject, onPress, onDe
 
   return (
     <TouchableOpacity
-      style={styles.container}
+      style={[styles.container, subject.isDeleting && styles.deleting]}
       onPress={onPress}
       activeOpacity={0.7}
+      disabled={subject.isDeleting}
     >
-      <View style={[styles.iconContainer, { backgroundColor: subject.color + '15' }]}>
+      {subject.isDeleting && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={subject.color} />
+          <Text style={styles.deletingText}>Suppression...</Text>
+        </View>
+      )}
+      
+      <View style={[styles.iconContainer, { backgroundColor: subject.color + '15' }, subject.isDeleting && styles.fadedContent]}>
         <Ionicons
           name={getSubjectIcon(subject) as any}
           size={32}
@@ -49,7 +57,7 @@ export const SubjectCard: React.FC<SubjectCardProps> = ({ subject, onPress, onDe
         />
       </View>
 
-      <Text style={styles.name} numberOfLines={2}>
+      <Text style={[styles.name, subject.isDeleting && styles.fadedContent]} numberOfLines={2}>
         {subject.name}
       </Text>
     </TouchableOpacity>
@@ -112,5 +120,29 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 3,
     elevation: 2,
+  },
+  deleting: {
+    opacity: 0.9,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    gap: 8,
+  },
+  fadedContent: {
+    opacity: 0.3,
+  },
+  deletingText: {
+    ...Typography.caption1,
+    color: Colors.text.secondary,
+    fontWeight: '600',
   },
 });

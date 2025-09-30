@@ -18,6 +18,7 @@ export interface Subject {
   updatedAt: Date;
   lessonsCount?: number;
   completedLessons?: number;
+  isDeleting?: boolean;
 }
 
 export interface Lesson {

@@ -83,6 +83,9 @@ export class DataService {
   // Delete subject
   static async deleteSubject(subjectId: string): Promise<void> {
     try {
+      // Mark the subject as deleting
+      await this.updateSubject(subjectId, { isDeleting: true });
+
       // First delete all lessons
       const lessons = await this.getSubjectLessons(subjectId);
       for (const lesson of lessons) {
@@ -93,6 +96,12 @@ export class DataService {
       await deleteDoc(doc(db, 'subjects', subjectId));
     } catch (error) {
       console.error('Error deleting subject:', error);
+      // Remove the deleting flag if there's an error
+      try {
+        await this.updateSubject(subjectId, { isDeleting: false });
+      } catch (updateError) {
+        console.error('Error removing deleting flag:', updateError);
+      }
       throw error;
     }
   }
