@@ -46,6 +46,7 @@ export const RecordingStudioScreen: React.FC = () => {
     stopRecordingSession,
     deleteRecordingSession,
     setIsOnRecordingScreen,
+    updateSessionDuration,
   } = useRecording();
 
   const {
@@ -101,11 +102,29 @@ export const RecordingStudioScreen: React.FC = () => {
     }
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
-    
+
     return () => {
       subscription.remove();
     };
   }, []);
+
+  // Timer effect to increment duration during recording
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+
+    if (isRecording && currentSession) {
+      interval = setInterval(() => {
+        const newDuration = (currentSession.durationMillis || 0) + 1000;
+        updateSessionDuration(newDuration);
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isRecording, currentSession]);
 
   const handleAppStateChange = async (nextAppState: AppStateStatus) => {
     if (appState.current.match(/active/) && nextAppState.match(/inactive|background/)) {
