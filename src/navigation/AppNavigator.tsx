@@ -20,11 +20,11 @@ import { CreateLessonScreen } from '../screens/CreateLessonScreen';
 import { ProcessingScreen } from '../screens/ProcessingScreen';
 import { RecordingSubjectPickerScreen } from '../screens/RecordingSubjectPickerScreen';
 import { RecordingStudioScreen } from '../screens/RecordingStudioScreen';
-import { DraftsScreen } from '../screens/DraftsScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { SignUpScreen } from '../screens/SignUpScreen';
 import { useAuth } from '../contexts/AuthContext';
 import { RecordingProvider } from '../contexts/RecordingContext';
+import { FloatingRecordingBubble } from '../components/FloatingRecordingBubble';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 
@@ -125,59 +125,58 @@ const AuthStack = () => {
 
 const AppStack = () => {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: false,
-        cardStyle: { backgroundColor: Colors.background },
-      }}
-    >
-      <Stack.Screen name="MainTabs" component={MainTabs} />
-      <Stack.Screen name="Lesson" component={LessonScreen} />
-      <Stack.Screen 
-        name="Transcription" 
-        component={TranscriptionScreen}
-      />
-      <Stack.Screen 
-        name="Flashcards" 
-        component={FlashcardsScreen}
-      />
-      <Stack.Screen 
-        name="Quiz" 
-        component={QuizScreen}
-      />
-      <Stack.Screen 
-        name="Chat" 
-        component={ChatScreen}
-      />
-      <Stack.Screen 
-        name="AudioImport" 
-        component={AudioImportScreen}
-      />
-      <Stack.Screen
-        name="RecordingSubjectPicker"
-        component={RecordingSubjectPickerScreen}
-      />
-      <Stack.Screen
-        name="RecordingStudio"
-        component={RecordingStudioScreen}
-      />
-      <Stack.Screen 
-        name="CreateSubject" 
-        component={CreateSubjectScreen}
-      />
-      <Stack.Screen 
-        name="CreateLesson" 
-        component={CreateLessonScreen}
-      />
-      <Stack.Screen
-        name="ProcessingScreen"
-        component={ProcessingScreen}
-      />
-      <Stack.Screen
-        name="Drafts"
-        component={DraftsScreen}
-      />
-    </Stack.Navigator>
+    <>
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          cardStyle: { backgroundColor: Colors.background },
+        }}
+      >
+        <Stack.Screen name="MainTabs" component={MainTabs} />
+        <Stack.Screen name="Lesson" component={LessonScreen} />
+        <Stack.Screen 
+          name="Transcription" 
+          component={TranscriptionScreen}
+        />
+        <Stack.Screen 
+          name="Flashcards" 
+          component={FlashcardsScreen}
+        />
+        <Stack.Screen 
+          name="Quiz" 
+          component={QuizScreen}
+        />
+        <Stack.Screen 
+          name="Chat" 
+          component={ChatScreen}
+        />
+        <Stack.Screen 
+          name="AudioImport" 
+          component={AudioImportScreen}
+        />
+        <Stack.Screen
+          name="RecordingSubjectPicker"
+          component={RecordingSubjectPickerScreen}
+        />
+        <Stack.Screen
+          name="RecordingStudio"
+          component={RecordingStudioScreen}
+        />
+        <Stack.Screen 
+          name="CreateSubject" 
+          component={CreateSubjectScreen}
+        />
+        <Stack.Screen 
+          name="CreateLesson" 
+          component={CreateLessonScreen}
+        />
+        <Stack.Screen
+          name="ProcessingScreen"
+          component={ProcessingScreen}
+        />
+      </Stack.Navigator>
+      <FloatingRecordingBubble />
+    </>
   );
 };
 

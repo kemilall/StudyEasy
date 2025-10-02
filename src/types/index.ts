@@ -44,26 +44,6 @@ export interface Lesson {
   subjectColor?: string;
 }
 
-export interface RecordingDraft {
-  id: string; // lessonId associated with the recording session
-  userId: string;
-  subjectId: string;
-  subjectName: string;
-  subjectColor?: string;
-  lessonName: string;
-  localFileUri: string;
-  durationMillis: number;
-  segments: RecordingSegment[];
-  updatedAt: number;
-  status: 'recording' | 'paused' | 'stopped';
-}
-
-export interface RecordingSegment {
-  id: string;
-  uri: string;
-  durationMillis: number;
-  createdAt: number;
-}
 
 export interface Flashcard {
   id: string;

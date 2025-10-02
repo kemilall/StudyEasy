@@ -1,124 +1,112 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { useNavigation } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { RecordingDraft } from '../types';
+import { AppState, AppStateStatus } from 'react-native';
+
+interface RecordingSession {
+  subjectId: string;
+  subjectName: string;
+  subjectColor: string;
+  lessonId: string;
+  lessonName: string;
+  durationMillis: number;
+}
 
 interface RecordingContextType {
   isRecording: boolean;
-  currentDraft: RecordingDraft | null;
-  startRecording: (subjectId: string, subjectName: string, lessonName: string) => void;
-  stopRecording: () => void;
-  pauseRecording: () => void;
-  resumeRecording: () => void;
-  saveAsDraft: () => void;
-  cancelRecording: () => void;
-  clearDraft: () => void;
+  isPaused: boolean;
+  currentSession: RecordingSession | null;
+  isOnRecordingScreen: boolean;
+  startRecordingSession: (session: RecordingSession) => void;
+  pauseRecordingSession: () => void;
+  resumeRecordingSession: () => void;
+  stopRecordingSession: () => void;
+  deleteRecordingSession: () => void;
+  setIsOnRecordingScreen: (value: boolean) => void;
+  updateSessionDuration: (durationMillis: number) => void;
 }
 
 const RecordingContext = createContext<RecordingContextType | undefined>(undefined);
 
+export const useRecording = (): RecordingContextType => {
+  const context = useContext(RecordingContext);
+  if (context === undefined) {
+    throw new Error('useRecording must be used within a RecordingProvider');
+  }
+  return context;
+};
+
 export const RecordingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const navigation = useNavigation();
   const [isRecording, setIsRecording] = useState(false);
-  const [currentDraft, setCurrentDraft] = useState<RecordingDraft | null>(null);
-  const [hasStartedRecording, setHasStartedRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [currentSession, setCurrentSession] = useState<RecordingSession | null>(null);
+  const [isOnRecordingScreen, setIsOnRecordingScreen] = useState(false);
 
-  // Load draft on mount
+  const wasRecordingBeforeBackgroundRef = useRef(false);
+
+  // Handle app state changes (background/foreground)
   useEffect(() => {
-    loadDraft();
-  }, []);
-
-  const loadDraft = async () => {
-    try {
-      // Load the most recent draft
-      const keys = await AsyncStorage.getAllKeys();
-      const draftKeys = keys.filter(key => key.startsWith('draft_'));
-
-      if (draftKeys.length > 0) {
-        // Get the most recent draft
-        const mostRecentKey = draftKeys.sort().pop();
-        if (mostRecentKey) {
-          const draftData = await AsyncStorage.getItem(mostRecentKey);
-          if (draftData) {
-            const draft = JSON.parse(draftData);
-            setCurrentDraft(draft);
-          }
-        }
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'background' && isRecording && !isPaused) {
+        // App going to background while recording - pause the recording
+        wasRecordingBeforeBackgroundRef.current = true;
+        pauseRecordingSession();
+      } else if (nextAppState === 'active' && wasRecordingBeforeBackgroundRef.current && !isOnRecordingScreen) {
+        // App coming back to foreground - resume recording if we were recording before
+        wasRecordingBeforeBackgroundRef.current = false;
+        resumeRecordingSession();
       }
-    } catch (error) {
-      console.error('Failed to load draft:', error);
-    }
-  };
-
-  const startRecording = (subjectId: string, subjectName: string, lessonName: string) => {
-    setIsRecording(true);
-    setHasStartedRecording(true);
-
-    // Create initial draft structure
-    const draft: RecordingDraft = {
-      id: `temp_${Date.now()}`,
-      userId: '', // Will be filled by RecordingStudioScreen
-      subjectId,
-      subjectName,
-      subjectColor: '', // Will be filled by RecordingStudioScreen
-      lessonName,
-      localFileUri: '',
-      durationMillis: 0,
-      segments: [],
-      updatedAt: Date.now(),
-      status: 'recording',
     };
 
-    setCurrentDraft(draft);
-  };
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription.remove();
+  }, [isRecording, isPaused, isOnRecordingScreen]);
 
-  const stopRecording = () => {
-    setIsRecording(false);
-  };
-
-  const pauseRecording = () => {
-    setIsRecording(false);
-  };
-
-  const resumeRecording = () => {
+  const startRecordingSession = (session: RecordingSession) => {
+    setCurrentSession(session);
     setIsRecording(true);
+    setIsPaused(false);
   };
 
-  const saveAsDraft = () => {
+  const pauseRecordingSession = () => {
+    setIsPaused(true);
     setIsRecording(false);
-    setCurrentDraft(null);
-    // The draft will be saved by RecordingStudioScreen
   };
 
-  const cancelRecording = () => {
+  const resumeRecordingSession = () => {
+    setIsRecording(true);
+    setIsPaused(false);
+  };
+
+  const stopRecordingSession = () => {
     setIsRecording(false);
-    setCurrentDraft(null);
-    setHasStartedRecording(false);
+    setIsPaused(false);
+    setCurrentSession(null);
   };
 
-  const clearDraft = () => {
-    setCurrentDraft(null);
-    setHasStartedRecording(false);
+  const deleteRecordingSession = () => {
+    stopRecordingSession();
   };
 
-  // Navigation logic
-  useEffect(() => {
-    if (hasStartedRecording && !isRecording && !currentDraft) {
-      // After stopping recording and no draft, go back to home
-      // This will be handled by the navigation container
+  const updateSessionDuration = (durationMillis: number) => {
+    if (currentSession) {
+      setCurrentSession({
+        ...currentSession,
+        durationMillis,
+      });
     }
-  }, [hasStartedRecording, isRecording, currentDraft]);
+  };
 
   const value: RecordingContextType = {
     isRecording,
-    currentDraft,
-    startRecording,
-    stopRecording,
-    pauseRecording,
-    resumeRecording,
-    saveAsDraft,
-    cancelRecording,
-    clearDraft,
+    isPaused,
+    currentSession,
+    isOnRecordingScreen,
+    startRecordingSession,
+    pauseRecordingSession,
+    resumeRecordingSession,
+    stopRecordingSession,
+    deleteRecordingSession,
+    setIsOnRecordingScreen,
+    updateSessionDuration,
   };
 
   return (
@@ -126,12 +114,4 @@ export const RecordingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       {children}
     </RecordingContext.Provider>
   );
-};
-
-export const useRecording = () => {
-  const context = useContext(RecordingContext);
-  if (context === undefined) {
-    throw new Error('useRecording must be used within a RecordingProvider');
-  }
-  return context;
 };

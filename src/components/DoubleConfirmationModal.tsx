@@ -15,11 +15,12 @@ interface DoubleConfirmationModalProps {
   visible: boolean;
   title: string;
   message: string;
-  warningMessage: string;
+  warningMessage?: string;
   confirmText?: string;
   cancelText?: string;
   onConfirm: () => void;
   onCancel: () => void;
+  isDangerous?: boolean;
 }
 
 export const DoubleConfirmationModal: React.FC<DoubleConfirmationModalProps> = ({
@@ -31,8 +32,10 @@ export const DoubleConfirmationModal: React.FC<DoubleConfirmationModalProps> = (
   cancelText = 'Annuler',
   onConfirm,
   onCancel,
+  isDangerous = false,
 }) => {
   const [step, setStep] = useState<1 | 2>(1);
+  const isDoubleConfirmation = !!warningMessage;
 
   const handleReset = () => {
     setStep(1);
@@ -44,7 +47,12 @@ export const DoubleConfirmationModal: React.FC<DoubleConfirmationModalProps> = (
   };
 
   const handleFirstConfirm = () => {
-    setStep(2);
+    if (isDoubleConfirmation) {
+      setStep(2);
+    } else {
+      handleReset();
+      onConfirm();
+    }
   };
 
   const handleFinalConfirm = () => {
@@ -71,8 +79,8 @@ export const DoubleConfirmationModal: React.FC<DoubleConfirmationModalProps> = (
           {step === 1 ? (
             <>
               <View style={styles.header}>
-                <View style={[styles.iconContainer, { backgroundColor: Colors.accent.orange + '20' }]}>
-                  <Ionicons name="warning" size={24} color={Colors.accent.orange} />
+                <View style={[styles.iconContainer, { backgroundColor: (isDangerous ? Colors.accent.red : Colors.accent.orange) + '20' }]}>
+                  <Ionicons name="warning" size={24} color={isDangerous ? Colors.accent.red : Colors.accent.orange} />
                 </View>
                 <Text style={styles.title}>{title}</Text>
               </View>
@@ -89,11 +97,11 @@ export const DoubleConfirmationModal: React.FC<DoubleConfirmationModalProps> = (
                 </TouchableOpacity>
                 
                 <TouchableOpacity
-                  style={[styles.button, styles.warningButton]}
+                  style={[styles.button, isDangerous ? styles.confirmButton : styles.warningButton]}
                   onPress={handleFirstConfirm}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.warningText}>Supprimer</Text>
+                  <Text style={styles.warningText}>{confirmText}</Text>
                 </TouchableOpacity>
               </View>
             </>

@@ -15,7 +15,6 @@ import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { Subject } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import { useRecording } from '../contexts/RecordingContext';
 import { DataService } from '../services/dataService';
 
 interface RouteParams {
@@ -26,7 +25,6 @@ export const RecordingSubjectPickerScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { user } = useAuth();
-  const { startRecording } = useRecording();
   const { initialLessonName } = (route.params as RouteParams) || {};
 
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -55,14 +53,7 @@ export const RecordingSubjectPickerScreen: React.FC = () => {
   const handleStartRecording = () => {
     if (!selectedSubject || !lessonName.trim()) return;
 
-    // Start recording in context
-    startRecording(
-      selectedSubject.id,
-      selectedSubject.name,
-      lessonName.trim()
-    );
-
-    // Navigate directly to RecordingStudio
+    // Navigate directly to RecordingStudio (session will be created there)
     (navigation as any).navigate('RecordingStudio', {
       subjectId: selectedSubject.id,
       subjectName: selectedSubject.name,
@@ -110,12 +101,7 @@ export const RecordingSubjectPickerScreen: React.FC = () => {
           <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.title}>Nouvel enregistrement</Text>
-        <TouchableOpacity
-          onPress={() => (navigation as any).navigate('Drafts')}
-          style={styles.draftsButton}
-        >
-          <Ionicons name="document-outline" size={20} color={Colors.text.secondary} />
-        </TouchableOpacity>
+        <View style={styles.placeholder} />
       </View>
 
       <View style={styles.content}>
@@ -205,13 +191,6 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: 40,
-  },
-  draftsButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 20,
   },
   content: {
     flex: 1,

@@ -10,11 +10,10 @@ import {
   where, 
   orderBy,
   onSnapshot,
-  Timestamp,
-  setDoc
+  Timestamp
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { Subject, Lesson, RecordingDraft } from '../types';
+import { Subject, Lesson } from '../types';
 
 export class DataService {
   // SUBJECTS
@@ -469,37 +468,4 @@ export class DataService {
     });
   }
 
-  // RECORDING DRAFTS
-
-  static async saveRecordingDraft(userId: string, draft: RecordingDraft): Promise<void> {
-    try {
-      const draftRef = doc(db, 'users', userId, 'recordingDrafts', draft.id);
-      await setDoc(draftRef, draft);
-    } catch (error) {
-      console.error('Error saving recording draft:', error);
-      throw error;
-    }
-  }
-
-  static subscribeToRecordingDrafts(userId: string, callback: (drafts: RecordingDraft[]) => void) {
-    const draftsRef = collection(db, 'users', userId, 'recordingDrafts');
-    const q = query(draftsRef, orderBy('updatedAt', 'desc'));
-    
-    return onSnapshot(q, (snapshot) => {
-      const drafts = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as RecordingDraft));
-      callback(drafts);
-    });
-  }
-
-  static async deleteRecordingDraft(userId: string, draftId: string): Promise<void> {
-    try {
-      await deleteDoc(doc(db, 'users', userId, 'recordingDrafts', draftId));
-    } catch (error) {
-      console.error('Error deleting recording draft:', error);
-      throw error;
-    }
-  }
 }
