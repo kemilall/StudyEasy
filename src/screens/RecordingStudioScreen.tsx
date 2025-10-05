@@ -70,11 +70,15 @@ export const RecordingStudioScreen: React.FC = () => {
   const [lessonId, setLessonId] = useState(existingLessonId || globalLessonId || '');
   const [showExitModal, setShowExitModal] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   
   // Refs
   const appState = useRef(AppState.currentState);
   const lessonNameRef = useRef(initialLessonName || currentSession?.lessonName || 'Enregistrement');
   const hasCreatedLesson = useRef(false);
+  
+  // Animation for recording pulse
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Mark that we're on the recording screen
   useFocusEffect(
@@ -144,14 +148,11 @@ export const RecordingStudioScreen: React.FC = () => {
     try {
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
-          'Permission microphone requise',
-          'L\'application a besoin d\'accéder au microphone pour enregistrer.',
-          [{ text: 'OK' }]
-        );
+        setHasPermission(false);
         return;
       }
       
+      setHasPermission(true);
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -159,9 +160,35 @@ export const RecordingStudioScreen: React.FC = () => {
       });
     } catch (error) {
       console.error('Failed to setup audio:', error);
-      Alert.alert('Erreur', 'Impossible de configurer l\'audio');
+      setHasPermission(false);
     }
   };
+
+  const requestPermission = async () => {
+    await setupAudio();
+  };
+
+  // Pulse animation for recording button
+  useEffect(() => {
+    if (isRecording) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      pulseAnim.setValue(1);
+    }
+  }, [isRecording]);
 
   const startRecording = async () => {
     try {
@@ -413,29 +440,125 @@ export const RecordingStudioScreen: React.FC = () => {
 
   const displayDuration = currentSession?.durationMillis || 0;
 
-  // Pulse animation for recording button
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  // Permission Gate
+  if (hasPermission === false) {
+    return (
+      <View style={{ flex: 1, backgroundColor: Colors.surface }}>
+        <ImageBackground
+          source={BackgroundWavesImage}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100%',
+            height: '100%',
+          }}
+          resizeMode="cover"
+          imageStyle={{ opacity: 0.08 }}
+        />
+        <SafeAreaView style={{ flex: 1 }}>
+          {/* Header */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 20,
+            paddingVertical: 16,
+            height: 56,
+          }}>
+            <TouchableOpacity onPress={handleBackPress}>
+              <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
+            <Text style={{
+              ...Typography.h2,
+              color: Colors.textPrimary,
+              fontWeight: '600',
+            }}>
+              Enregistrer un cours
+            </Text>
+            <View style={{ width: 24 }} />
+          </View>
 
-  useEffect(() => {
-    if (isRecording) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.1,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    } else {
-      pulseAnim.setValue(1);
-    }
-  }, [isRecording]);
+          {/* Permission Content */}
+          <View style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingHorizontal: 32,
+          }}>
+            <View style={{
+              width: 96,
+              height: 96,
+              borderRadius: 48,
+              marginBottom: 32,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+              <LinearGradient
+                colors={DesignTokens.gradients.brand}
+                style={{
+                  width: 96,
+                  height: 96,
+                  borderRadius: 48,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <Ionicons name="mic-outline" size={48} color={Colors.textOnPrimary} />
+              </LinearGradient>
+            </View>
+
+            <Text style={{
+              ...Typography.h1,
+              color: Colors.textPrimary,
+              fontWeight: '700',
+              textAlign: 'center',
+              marginBottom: 12,
+              fontSize: 28,
+            }}>
+              Autoriser le microphone
+            </Text>
+
+            <Text style={{
+              ...Typography.body,
+              color: Colors.textSecondary,
+              textAlign: 'center',
+              lineHeight: 24,
+              marginBottom: 40,
+            }}>
+              StudyEasy a besoin d'accéder à votre microphone pour enregistrer vos cours.
+            </Text>
+
+            <TouchableOpacity
+              onPress={requestPermission}
+              style={{ width: '100%', maxWidth: 300 }}
+            >
+              <LinearGradient
+                colors={DesignTokens.gradients.brand}
+                style={{
+                  paddingVertical: 16,
+                  borderRadius: 16,
+                  alignItems: 'center',
+                  ...DesignTokens.shadows.sm,
+                }}
+              >
+                <Text style={{
+                  ...Typography.body,
+                  color: Colors.textOnPrimary,
+                  fontWeight: '600',
+                  fontSize: 16,
+                }}>
+                  Autoriser le microphone
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: Colors.surface }}>
@@ -452,7 +575,7 @@ export const RecordingStudioScreen: React.FC = () => {
           height: '100%',
         }}
         resizeMode="cover"
-        imageStyle={{ opacity: 0.06 }}
+        imageStyle={{ opacity: 0.08 }}
       />
 
       <SafeAreaView style={{ flex: 1 }}>
@@ -463,19 +586,9 @@ export const RecordingStudioScreen: React.FC = () => {
           justifyContent: 'space-between',
           paddingHorizontal: 20,
           paddingVertical: 16,
+          height: 56,
         }}>
-          <TouchableOpacity
-            onPress={handleBackPress}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              backgroundColor: Colors.surfaceAlt,
-              justifyContent: 'center',
-              alignItems: 'center',
-              ...DesignTokens.shadows.sm,
-            }}
-          >
+          <TouchableOpacity onPress={handleBackPress}>
             <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
           </TouchableOpacity>
           
@@ -488,223 +601,233 @@ export const RecordingStudioScreen: React.FC = () => {
               {subjectName}
             </Text>
             <Text style={{
-              ...Typography.h3,
+              ...Typography.body,
               color: Colors.textPrimary,
-              fontWeight: '700',
+              fontWeight: '600',
             }}>
               {lessonNameRef.current}
             </Text>
           </View>
           
-          <View style={{ width: 40 }} />
+          <TouchableOpacity>
+            <Ionicons name="help-circle-outline" size={24} color={Colors.textSecondary} />
+          </TouchableOpacity>
         </View>
 
-        {/* Timer Section */}
-        <View style={{
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          paddingHorizontal: 40,
-        }}>
-          {/* Status Badge */}
-          {isRecording && (
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: Colors.danger + '15',
-              paddingHorizontal: 16,
-              paddingVertical: 8,
-              borderRadius: 20,
-              marginBottom: 24,
-              gap: 8,
-            }}>
-              <View style={{
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: Colors.danger,
-              }} />
-              <Text style={{
-                ...Typography.small,
-                color: Colors.danger,
-                fontWeight: '600',
-              }}>
-                Enregistrement en cours
-              </Text>
-            </View>
-          )}
-
-          {/* Timer Display */}
+        {/* Main Content */}
+        <View style={{ flex: 1, justifyContent: 'space-between', paddingBottom: 48 }}>
+          {/* Timer Section */}
           <View style={{
-            backgroundColor: Colors.surface,
-            borderRadius: 24,
-            padding: 32,
-            marginBottom: 40,
-            ...DesignTokens.shadows.md,
-            borderWidth: 1,
-            borderColor: Colors.border,
-            minWidth: 280,
+            flex: 1,
+            justifyContent: 'center',
             alignItems: 'center',
           }}>
-            <Text style={{
-              fontSize: 64,
-              fontWeight: '300',
-              color: Colors.textPrimary,
-              fontVariant: ['tabular-nums'],
-              letterSpacing: 2,
-            }}>
-              {formatDuration(displayDuration)}
-            </Text>
-          </View>
-
-          {/* Instructions */}
-          {!isRecording && !isPaused && (
-            <Text style={{
-              ...Typography.body,
-              color: Colors.textSecondary,
-              textAlign: 'center',
-              lineHeight: 24,
-            }}>
-              Appuyez sur le bouton pour commencer l'enregistrement
-            </Text>
-          )}
-        </View>
-
-        {/* Controls Section */}
-        <View style={{
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingHorizontal: 40,
-          paddingBottom: 60,
-        }}>
-          {!isPaused ? (
-            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-              <TouchableOpacity
-                style={{
-                  width: 88,
-                  height: 88,
-                  borderRadius: 44,
-                  backgroundColor: isRecording ? Colors.warning : Colors.danger,
+            {!isRecording && !isPaused ? (
+              // Idle State
+              <View style={{ alignItems: 'center', paddingHorizontal: 32 }}>
+                <View style={{
+                  width: 96,
+                  height: 96,
+                  borderRadius: 48,
+                  backgroundColor: Colors.surfaceAlt,
                   justifyContent: 'center',
                   alignItems: 'center',
-                  ...DesignTokens.shadows.lg,
-                }}
-                onPress={isRecording ? handlePauseRecording : startRecording}
-                activeOpacity={0.8}
-              >
-                <Ionicons 
-                  name={isRecording ? "pause" : "mic"} 
-                  size={40} 
-                  color={Colors.textOnPrimary} 
-                />
-              </TouchableOpacity>
-            </Animated.View>
-          ) : (
-            <View style={{
-              width: '100%',
-              alignItems: 'center',
-              gap: 24,
-            }}>
-              <Text style={{
-                ...Typography.h3,
-                color: Colors.textSecondary,
-                marginBottom: 8,
-              }}>
-                Enregistrement en pause
-              </Text>
-              
-              <View style={{
-                flexDirection: 'row',
-                gap: 16,
-                alignItems: 'center',
-              }}>
-                <TouchableOpacity
-                  onPress={handleResumeRecording}
-                  activeOpacity={0.8}
-                >
-                  <LinearGradient
-                    colors={DesignTokens.gradients.brand}
-                    style={{
-                      flexDirection: 'row',
-                      paddingHorizontal: 24,
-                      paddingVertical: 16,
-                      borderRadius: 16,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 8,
-                      minWidth: 140,
-                    }}
-                  >
-                    <Ionicons name="mic" size={24} color={Colors.textOnPrimary} />
+                  marginBottom: 32,
+                  ...DesignTokens.shadows.sm,
+                }}>
+                  <Ionicons name="mic" size={48} color={Colors.primaryBlue} />
+                </View>
+                
+                <Text style={{
+                  ...Typography.h1,
+                  color: Colors.textPrimary,
+                  fontWeight: '700',
+                  textAlign: 'center',
+                  marginBottom: 12,
+                  fontSize: 28,
+                }}>
+                  Prêt à enregistrer ?
+                </Text>
+                
+                <Text style={{
+                  ...Typography.body,
+                  color: Colors.textSecondary,
+                  textAlign: 'center',
+                  lineHeight: 24,
+                }}>
+                  Appuyez sur le bouton pour commencer l'enregistrement
+                </Text>
+              </View>
+            ) : (
+              // Recording/Paused State - Timer
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{
+                  fontSize: 64,
+                  fontWeight: '300',
+                  color: Colors.textPrimary,
+                  fontVariant: ['tabular-nums'],
+                  letterSpacing: 2,
+                  marginBottom: 16,
+                }}>
+                  {formatDuration(displayDuration)}
+                </Text>
+                
+                {isPaused && (
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: Colors.warning + '20',
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 20,
+                    gap: 8,
+                  }}>
+                    <Ionicons name="pause-circle" size={20} color={Colors.warning} />
                     <Text style={{
                       ...Typography.body,
-                      color: Colors.textOnPrimary,
+                      color: Colors.warning,
                       fontWeight: '600',
                     }}>
-                      Reprendre
+                      En pause
                     </Text>
-                  </LinearGradient>
-                </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+
+          {/* Controls */}
+          <View style={{ alignItems: 'center', paddingHorizontal: 32 }}>
+            {!isPaused ? (
+              // Recording or Idle Controls
+              <View style={{ alignItems: 'center' }}>
+                <Animated.View style={{ transform: [{ scale: isRecording ? pulseAnim : 1 }] }}>
+                  <TouchableOpacity
+                    onPress={isRecording ? handlePauseRecording : startRecording}
+                    activeOpacity={0.8}
+                  >
+                    <LinearGradient
+                      colors={isRecording ? [Colors.danger, '#FF8566'] : DesignTokens.gradients.brand}
+                      style={{
+                        width: 96,
+                        height: 96,
+                        borderRadius: 48,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        ...DesignTokens.shadows.lg,
+                      }}
+                    >
+                      <Ionicons
+                        name={isRecording ? "pause" : "mic"}
+                        size={40}
+                        color={Colors.textOnPrimary}
+                      />
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </Animated.View>
+                
+                {isRecording && (
+                  <Text style={{
+                    ...Typography.small,
+                    color: Colors.textSecondary,
+                    marginTop: 20,
+                    textAlign: 'center',
+                  }}>
+                    Appuyez pour mettre en pause
+                  </Text>
+                )}
+              </View>
+            ) : (
+              // Paused Controls
+              <View style={{ width: '100%', alignItems: 'center', gap: 16 }}>
+                <View style={{ flexDirection: 'row', gap: 12, width: '100%', maxWidth: 400 }}>
+                  <TouchableOpacity
+                    style={{ flex: 1 }}
+                    onPress={handleResumeRecording}
+                    activeOpacity={0.8}
+                  >
+                    <LinearGradient
+                      colors={DesignTokens.gradients.brand}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        paddingVertical: 16,
+                        borderRadius: 16,
+                        gap: 8,
+                        ...DesignTokens.shadows.sm,
+                      }}
+                    >
+                      <Ionicons name="play" size={20} color={Colors.textOnPrimary} />
+                      <Text style={{
+                        ...Typography.body,
+                        color: Colors.textOnPrimary,
+                        fontWeight: '600',
+                      }}>
+                        Reprendre
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={{ flex: 1 }}
+                    onPress={handleValidateRecording}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingVertical: 16,
+                      borderRadius: 16,
+                      gap: 8,
+                      backgroundColor: Colors.accentGreen,
+                      ...DesignTokens.shadows.sm,
+                    }}>
+                      <Ionicons name="checkmark" size={20} color={Colors.textOnPrimary} />
+                      <Text style={{
+                        ...Typography.body,
+                        color: Colors.textOnPrimary,
+                        fontWeight: '600',
+                      }}>
+                        Valider
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
                 
                 <TouchableOpacity
+                  onPress={() => setShowExitModal(true)}
                   style={{
-                    flexDirection: 'row',
-                    backgroundColor: Colors.accentGreen,
+                    paddingVertical: 12,
                     paddingHorizontal: 24,
-                    paddingVertical: 16,
-                    borderRadius: 16,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    minWidth: 140,
-                    ...DesignTokens.shadows.sm,
                   }}
-                  onPress={handleValidateRecording}
-                  activeOpacity={0.8}
                 >
-                  <Ionicons name="checkmark" size={24} color={Colors.textOnPrimary} />
                   <Text style={{
                     ...Typography.body,
-                    color: Colors.textOnPrimary,
+                    color: Colors.danger,
                     fontWeight: '600',
                   }}>
-                    Valider
+                    Quitter et supprimer
                   </Text>
                 </TouchableOpacity>
               </View>
-              
-              <TouchableOpacity
-                style={{
-                  paddingVertical: 12,
-                  paddingHorizontal: 24,
-                }}
-                onPress={() => setShowExitModal(true)}
-                activeOpacity={0.8}
-              >
-                <Text style={{
-                  ...Typography.body,
-                  color: Colors.danger,
-                  fontWeight: '600',
-                }}>
-                  Quitter et supprimer
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
+            )}
+          </View>
         </View>
-
-        {/* Exit Confirmation Modal */}
-        <DoubleConfirmationModal
-          visible={showExitModal}
-          title="Quitter l'enregistrement ?"
-          message="Si vous quittez maintenant, l'enregistrement sera définitivement supprimé."
-          confirmText="Oui, supprimer"
-          cancelText="Annuler"
-          onConfirm={handleConfirmExit}
-          onCancel={() => setShowExitModal(false)}
-          isDangerous={true}
-        />
       </SafeAreaView>
+
+      {/* Exit Confirmation Modal */}
+      <DoubleConfirmationModal
+        visible={showExitModal}
+        title="Quitter l'enregistrement ?"
+        message="Si vous quittez maintenant, l'enregistrement sera définitivement supprimé."
+        confirmText="Oui, supprimer"
+        cancelText="Annuler"
+        onConfirm={handleConfirmExit}
+        onCancel={() => setShowExitModal(false)}
+        isDangerous={true}
+      />
     </View>
   );
 };

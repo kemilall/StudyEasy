@@ -175,39 +175,71 @@ class AIService:
         lesson_name: str,
         subject_name: str
     ) -> StructuredCourse:
-        """Generate a structured course from input text using GPT-4.1"""
+        """Generate a comprehensive structured course from input text using GPT-4.1"""
         try:
             if self.client is None:
                 raise ValueError("OPENAI_API_KEY not set; content generation requires OpenAI.")
-            logger.info(f"[PARALLEL] Starting structured course generation for lesson '{lesson_name}'")
+            logger.info(f"[PARALLEL] Starting comprehensive structured course generation for lesson '{lesson_name}'")
 
             def _generate():
                 response = self.client.responses.create(
-                    model="gpt-4.1",
+                    model="gpt-5",
                     input=[
                         {
                             "role": "developer",
-                            "content": """You are an expert educational content creator designed to output JSON. Transform the provided text into a comprehensive, well-structured course.
+                            "content": """You are an expert educational content creator designed to output JSON. Transform the provided text into a comprehensive, well-structured course with detailed sections and subsections.
 
-IMPORTANT:
+CRITICAL REQUIREMENTS:
 - Preserve ALL essential information from the source material
-- Organize content logically with clear sections
+- Create a complete, structured course that covers everything
+- Organize content logically with clear sections and subsections
+- Use different content block types: 'text', 'example', 'formula', 'definition', 'bullet_points', 'summary'
+- Include mathematical formulas in proper LaTeX format when needed
+- Each subsection should contain multiple content blocks of various types
 - Ensure nothing important is lost
-- Make the content easy to understand and learn
-- Use clear headings and structure
 
 Return a JSON object with this exact structure:
 {
-  "title": "string",
-  "introduction": "string",
-  "sections": [{"heading": "string", "content": "string"}],
-  "key_points": ["string"],
-  "summary": "string"
-}"""
+  "title": "string - the main course title",
+  "overview": {
+    "objective": "string - main learning objective",
+    "main_ideas": ["array", "of", "key", "concepts"],
+    "structure": ["array", "of", "section", "titles"]
+  },
+  "sections": [
+    {
+      "title": "string - section title",
+      "subsections": [
+        {
+          "title": "string - subsection title",
+          "blocks": [
+            {
+              "type": "text|example|formula|definition|bullet_points|summary",
+              "content": "string - the actual content",
+              "title": "string - optional title for the block"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "conclusion": "string - comprehensive final summary",
+  "references": ["array", "of", "references", "if", "applicable"]
+}
+
+CONTENT BLOCK TYPES:
+- 'text': Regular explanatory text
+- 'example': Examples, case studies, or practical applications
+- 'formula': Mathematical formulas in LaTeX format (e.g., "E = mc²", "\\frac{d}{dx}\\int_a^b f(x)dx")
+- 'definition': Key definitions and concepts
+- 'bullet_points': Lists of key points, steps, or features
+- 'summary': Summary of the subsection content
+
+Make the course comprehensive and educational."""
                         },
                         {
                             "role": "user",
-                            "content": f"""Create a structured course from this content:
+                            "content": f"""Create a comprehensive structured course from this content:
 
 Subject: {subject_name}
 Lesson: {lesson_name}
@@ -216,10 +248,20 @@ Chapter: {chapter_name}
 Content:
 {text}
 
-Transform this into a comprehensive, organized course that preserves all essential information."""
+Transform this into a complete, detailed course structure with sections, subsections, and various content block types. Ensure ALL information is preserved and organized logically."""
                         }
                     ],
-                    text={"format": {"type": "json_object"}}
+                    text={
+                        "format": {
+                            "type": "json_object"
+                        },
+                        "verbosity": "high"
+                    },
+                    reasoning={
+                        "effort": "minimal"
+                    },
+                    tools=[],
+                    store=True
                 )
 
                 import json
@@ -229,7 +271,7 @@ Transform this into a comprehensive, organized course that preserves all essenti
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(self.executor, _generate)
 
-            logger.info(f"[PARALLEL] Course generation completed for lesson '{lesson_name}'")
+            logger.info(f"[PARALLEL] Comprehensive course generation completed for lesson '{lesson_name}'")
             return result
 
         except Exception as e:

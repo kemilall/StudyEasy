@@ -38,7 +38,33 @@ class QuizQuestion(BaseModel):
     correct_answer: int = Field(description="Index of the correct answer (0-2)", ge=0, le=2)
     explanation: str = Field(description="Explanation of why the answer is correct")
 
+class CourseOverview(BaseModel):
+    objective: str = Field(description="The main learning objective of the course")
+    main_ideas: List[str] = Field(description="Key concepts that will be covered")
+    structure: List[str] = Field(description="How the course is organized")
+
+class ContentBlock(BaseModel):
+    type: str = Field(description="Type of content block: 'text', 'example', 'formula', 'definition', 'bullet_points', 'summary'")
+    content: str = Field(description="The content of the block")
+    title: Optional[str] = Field(None, description="Optional title for the block")
+
+class Subsection(BaseModel):
+    title: str = Field(description="Title of the subsection")
+    blocks: List[ContentBlock] = Field(description="Content blocks within this subsection")
+
+class Section(BaseModel):
+    title: str = Field(description="Title of the main section")
+    subsections: List[Subsection] = Field(description="Subsections within this section")
+
 class StructuredCourse(BaseModel):
+    title: str = Field(description="Main title of the course")
+    overview: CourseOverview = Field(description="Course overview with objectives and structure")
+    sections: List[Section] = Field(description="Main sections of the course")
+    conclusion: str = Field(description="Final summary of the course")
+    references: List[str] = Field(default_factory=list, description="References and sources if applicable")
+
+# Legacy model for backward compatibility
+class SimpleStructuredCourse(BaseModel):
     title: str = Field(description="Title of the course section")
     introduction: str = Field(description="Brief introduction to the topic")
     sections: List[Dict[str, str]] = Field(description="Main sections of the course content")

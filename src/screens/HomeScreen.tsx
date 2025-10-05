@@ -66,7 +66,21 @@ export const HomeScreen: React.FC = () => {
 
   const handleImportAudioPress = () => {
     // Analytics event would go here
-    navigation.navigate('AudioImport' as never);
+    if (subjects.length === 0) {
+      // No subjects, redirect to create subject
+      navigation.navigate('CreateSubject' as never);
+    } else if (subjects.length === 1) {
+      // Only one subject, use it directly
+      navigation.navigate('AudioImport' as never, {
+        subjectId: subjects[0].id,
+      });
+    } else {
+      // Multiple subjects, let user choose (for now, use first one)
+      // TODO: Create a subject picker screen for import
+      navigation.navigate('AudioImport' as never, {
+        subjectId: subjects[0].id,
+      });
+    }
   };
 
   const handleImportCoursePress = () => {
@@ -132,11 +146,12 @@ export const HomeScreen: React.FC = () => {
           <HeroSection firstName={userProfile?.displayName?.split(' ')[0]} />
 
           {/* Quick Actions */}
-          <QuickActionsSection
-            onRecordPress={handleRecordPress}
-            onImportAudioPress={handleImportAudioPress}
-            onImportCoursePress={handleImportCoursePress}
-          />
+        <QuickActionsSection
+          onRecordPress={handleRecordPress}
+          onImportAudioPress={handleImportAudioPress}
+          onImportCoursePress={handleImportCoursePress}
+          subjects={subjects}
+        />
 
           {/* Recent Subjects */}
           <SubjectsCarousel subjects={displaySubjects} />

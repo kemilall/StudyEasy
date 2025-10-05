@@ -253,6 +253,7 @@ export class AIService {
           keyPoints: data.key_points,
           flashcards,
           quiz,
+          content: JSON.stringify(data.course), // Store structured course as JSON
         });
       }
 
@@ -381,7 +382,7 @@ export class AIService {
     }
   }
 
-  // Generate course from text
+  // Generate structured course from text (enhanced version)
   static async generateCourse(
     text: string,
     chapterName: string,
@@ -389,10 +390,24 @@ export class AIService {
     subjectName: string
   ): Promise<{
     title: string;
-    introduction: string;
-    sections: Array<{ heading: string; content: string }>;
-    key_points: string[];
-    summary: string;
+    overview: {
+      objective: string;
+      main_ideas: string[];
+      structure: string[];
+    };
+    sections: Array<{
+      title: string;
+      subsections: Array<{
+        title: string;
+        blocks: Array<{
+          type: 'text' | 'example' | 'formula' | 'definition' | 'bullet_points' | 'summary';
+          content: string;
+          title?: string;
+        }>;
+      }>;
+    }>;
+    conclusion: string;
+    references: string[];
   }> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/generate-course`, {

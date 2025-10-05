@@ -17,14 +17,34 @@ interface QuickActionsSectionProps {
   onRecordPress?: () => void;
   onImportAudioPress?: () => void;
   onImportCoursePress?: () => void;
+  subjects?: any[];
 }
 
 export const QuickActionsSection: React.FC<QuickActionsSectionProps> = ({
   onRecordPress,
   onImportAudioPress,
   onImportCoursePress,
+  subjects = [],
 }) => {
   const navigation = useNavigation<any>();
+
+  const handleImportAudioPress = () => {
+    if (subjects.length === 0) {
+      // No subjects, redirect to create subject
+      navigation.navigate('CreateSubject' as never);
+    } else if (subjects.length === 1) {
+      // Only one subject, use it directly
+      navigation.navigate('AudioImport' as never, {
+        subjectId: subjects[0].id,
+      });
+    } else {
+      // Multiple subjects, use first one for now
+      // TODO: Create a subject picker screen for import
+      navigation.navigate('AudioImport' as never, {
+        subjectId: subjects[0].id,
+      });
+    }
+  };
 
   return (
     <View
@@ -92,7 +112,7 @@ export const QuickActionsSection: React.FC<QuickActionsSectionProps> = ({
             alignItems: 'center',
             gap: 12,
           }}
-          onPress={() => navigation.navigate('AudioImport' as never)}
+          onPress={handleImportAudioPress}
           accessibilityLabel="Importer un audio"
         >
           <View

@@ -29,7 +29,23 @@ export const AudioImportScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { user } = useAuth();
-  const { subjectId, initialLessonName } = route.params as RouteParams;
+
+  // Safety check for route params
+  const routeParams = route.params as RouteParams | undefined;
+  const subjectId = routeParams?.subjectId;
+  const initialLessonName = routeParams?.initialLessonName;
+
+  // If no subjectId, go back or show error
+  useEffect(() => {
+    if (!subjectId) {
+      console.error('AudioImportScreen: No subjectId provided in route params');
+      Alert.alert(
+        'Erreur',
+        'Impossible d\'accéder à cette page sans sélectionner un sujet.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+    }
+  }, [subjectId, navigation]);
   
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -62,6 +78,10 @@ export const AudioImportScreen: React.FC = () => {
 
   const handleUpload = async () => {
     if (!user) return;
+    if (!subjectId) {
+      Alert.alert('Erreur', 'Sujet non défini. Veuillez revenir en arrière et réessayer.');
+      return;
+    }
     if (!lessonName.trim()) {
       Alert.alert('Erreur', 'Veuillez entrer un titre pour la leçon.');
       return;
@@ -70,7 +90,7 @@ export const AudioImportScreen: React.FC = () => {
       Alert.alert('Erreur', 'Veuillez sélectionner un fichier audio.');
       return;
     }
-    
+
     console.log('Selected file:', selectedFile);
     
     // Validate file URI

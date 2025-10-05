@@ -70,16 +70,50 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+// Content block types for structured courses
+export interface ContentBlock {
+  type: 'text' | 'example' | 'formula' | 'definition' | 'bullet_points' | 'summary';
+  content: string;
+  title?: string;
+}
+
+export interface Subsection {
+  title: string;
+  blocks: ContentBlock[];
+}
+
+export interface Section {
+  title: string;
+  subsections: Subsection[];
+}
+
+export interface CourseOverview {
+  objective: string;
+  main_ideas: string[];
+  structure: string[];
+}
+
+export interface StructuredCourse {
+  title: string;
+  overview: CourseOverview;
+  sections: Section[];
+  conclusion: string;
+  references: string[];
+}
+
+// Legacy course structure for backward compatibility
+export interface SimpleCourse {
+  title: string;
+  introduction: string;
+  sections: Array<{ heading: string; content: string }>;
+  key_points: string[];
+  summary: string;
+}
+
 // API Response types
 export interface ProcessedChapterResponse {
   transcription: string;
-  course: {
-    title: string;
-    introduction: string;
-    sections: Array<{ heading: string; content: string }>;
-    key_points: string[];
-    summary: string;
-  };
+  course: StructuredCourse | SimpleCourse; // Support both new and legacy formats
   flashcards: Array<{
     term: string;
     definition: string;
@@ -93,4 +127,5 @@ export interface ProcessedChapterResponse {
   }>;
   key_points: string[];
   summary: string;
+  lesson_id?: string;
 }

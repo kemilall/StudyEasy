@@ -8,6 +8,14 @@ export const Typography = {
   fontBody: 'System', // Using system font as fallback for Inter
 
   // Font sizes matching the spec
+  fontSize: {
+    xlarge: 20,
+    large: 17,
+    medium: 16,
+    small: 14,
+    xsmall: 12,
+  },
+
   h1: {
     fontSize: 48,
     fontWeight: '700',
@@ -144,4 +152,13 @@ export const Typography = {
     letterSpacing: 0,
     fontFamily: 'System',
   } as TextStyle,
+
+  // Font sizes matching the spec
+  fontSize: {
+    xlarge: 20,
+    large: 17,
+    medium: 16,
+    small: 14,
+    xsmall: 12,
+  },
 };
