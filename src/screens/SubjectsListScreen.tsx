@@ -2,20 +2,21 @@ import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  ScrollView,
   Dimensions,
   Alert,
+  ImageBackground,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
+import { DesignTokens } from '../constants/designTokens';
 import { SubjectsStackParamList } from '../navigation/types';
 import { useAuth } from '../contexts/AuthContext';
 import { DataService } from '../services/dataService';
@@ -30,7 +31,7 @@ export const SubjectsListScreen: React.FC = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { width } = Dimensions.get('window');
-  const CARD_GAP = 12;
+  const CARD_GAP = 16;
   const H_PADDING = 20;
   const CARD_WIDTH = (width - H_PADDING * 2 - CARD_GAP) / 2;
 
@@ -66,199 +67,201 @@ export const SubjectsListScreen: React.FC = () => {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.accent.blue} />
-        </View>
-      </SafeAreaView>
+      <View style={{ flex: 1, backgroundColor: Colors.surface }}>
+        <ImageBackground
+          source={require('../../assets/background_waves.png')}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100%',
+            height: '100%',
+          }}
+          resizeMode="cover"
+          imageStyle={{ opacity: 0.08 }}
+        />
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+            <ActivityIndicator size="large" color={Colors.primaryBlue} />
+          </View>
+        </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <FlatList
-        data={subjects}
-        keyExtractor={(item) => item.id}
-        renderItem={renderSubject}
-        numColumns={2}
-        columnWrapperStyle={{ gap: CARD_GAP, paddingHorizontal: H_PADDING, marginBottom: CARD_GAP }}
-        contentContainerStyle={{ paddingBottom: 32 }}
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <View>
-            {/* Header */}
-            <View style={styles.header}>
-            <View style={styles.headerTop}>
-              <View style={styles.titleContainer}>
-                <Text style={styles.title}>Mes Matières</Text>
-                <Text style={styles.subtitle}>Gérez vos cours par matière</Text>
+    <View style={{ flex: 1, backgroundColor: Colors.surface }}>
+      {/* Background decorative waves */}
+      <ImageBackground
+        source={require('../../assets/background_waves.png')}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100%',
+          height: '100%',
+        }}
+        resizeMode="cover"
+        imageStyle={{ opacity: 0.08 }}
+      />
+
+      <SafeAreaView style={{ flex: 1 }}>
+        <FlatList
+          data={subjects}
+          keyExtractor={(item) => item.id}
+          renderItem={renderSubject}
+          numColumns={2}
+          columnWrapperStyle={{
+            gap: CARD_GAP,
+            paddingHorizontal: H_PADDING,
+            marginBottom: CARD_GAP,
+          }}
+          contentContainerStyle={{
+            paddingTop: 32,
+            paddingBottom: 48,
+          }}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <View style={{ paddingHorizontal: 20, marginBottom: 32 }}>
+              {/* Hero Header */}
+              <View style={{
+                backgroundColor: Colors.surface,
+                borderRadius: 20,
+                padding: 24,
+                marginBottom: 8,
+                ...DesignTokens.shadows.sm,
+                borderWidth: 1,
+                borderColor: Colors.border,
+              }}>
+                <View style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 16,
+                }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{
+                      ...Typography.h1,
+                      color: Colors.textPrimary,
+                      fontWeight: '700',
+                      marginBottom: 4,
+                      fontSize: 28,
+                    }}>
+                      Mes Matières
+                    </Text>
+                    <Text style={{
+                      ...Typography.body,
+                      color: Colors.textSecondary,
+                      lineHeight: 22,
+                    }}>
+                      Organisez vos cours par matière
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 16,
+                      backgroundColor: Colors.surfaceAlt,
+                      borderWidth: 1,
+                      borderColor: Colors.border,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      ...DesignTokens.shadows.sm,
+                    }}
+                    onPress={() => (navigation as any).navigate('CreateSubject')}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name="add"
+                      size={24}
+                      color={Colors.primaryBlue}
+                    />
+                  </TouchableOpacity>
+                </View>
+
               </View>
-              <View style={styles.headerButtons}>
+            </View>
+          }
+          ListEmptyComponent={
+            <View style={{
+              paddingHorizontal: 20,
+              paddingTop: 40,
+              alignItems: 'center',
+            }}>
+              <View style={{
+                backgroundColor: Colors.surface,
+                borderRadius: 20,
+                padding: 48,
+                alignItems: 'center',
+                width: '100%',
+                ...DesignTokens.shadows.sm,
+                borderWidth: 1,
+                borderColor: Colors.border,
+              }}>
+                <View style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 20,
+                  backgroundColor: Colors.surfaceAlt,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 20,
+                }}>
+                  <Ionicons name="school-outline" size={40} color={Colors.textSecondary} />
+                </View>
+                <Text style={{
+                  ...Typography.h3,
+                  color: Colors.textPrimary,
+                  fontWeight: '700',
+                  marginBottom: 8,
+                  textAlign: 'center',
+                }}>
+                  Aucune matière
+                </Text>
+                <Text style={{
+                  ...Typography.body,
+                  color: Colors.textSecondary,
+                  textAlign: 'center',
+                  lineHeight: 24,
+                  marginBottom: 32,
+                }}>
+                  Créez votre première matière pour commencer à organiser vos cours
+                </Text>
                 <TouchableOpacity
-                  style={styles.iconButton}
                   onPress={() => (navigation as any).navigate('CreateSubject')}
-                  activeOpacity={0.8}
                 >
-                  <Ionicons 
-                    name="add" 
-                    size={24} 
-                    color={Colors.accent.blue} 
-                  />
+                  <LinearGradient
+                    colors={DesignTokens.gradients.brand}
+                    style={{
+                      paddingHorizontal: 24,
+                      paddingVertical: 14,
+                      borderRadius: 12,
+                    }}
+                  >
+                    <Text style={{
+                      ...Typography.body,
+                      color: Colors.textOnPrimary,
+                      fontWeight: '600',
+                    }}>
+                      Créer une matière
+                    </Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
             </View>
-            </View>
-          </View>
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyCard}>
-              <Ionicons name="school-outline" size={64} color={Colors.text.tertiary} />
-              <Text style={styles.emptyTitle}>Aucune matière</Text>
-              <Text style={styles.emptySubtitle}>
-                Appuyez sur le bouton + en haut pour créer votre première matière
-              </Text>
-            </View>
-          </View>
-        }
-      />
-    </SafeAreaView>
+          }
+        />
+      </SafeAreaView>
+    </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  titleContainer: {
-    flex: 1,
-  },
-  title: {
-    ...Typography.largeTitle,
-    color: Colors.text.primary,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  subtitle: {
-    ...Typography.body,
-    color: Colors.text.secondary,
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  iconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.gray[200],
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: Colors.card.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 2,
-    marginRight: 12,
-  },
-  editButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.gray[200],
-  },
-  editButtonIcon: {
-    marginRight: 6,
-  },
-  editButtonText: {
-    ...Typography.footnote,
-    fontWeight: '600',
-  },
-  subjectsContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 32,
-  },
-  subjectTile: {
-    height: 80,
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.gray[200],
-    shadowColor: Colors.card.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  subjectTileContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-  },
-  subjectTileName: {
-    ...Typography.subheadline,
-    color: Colors.text.primary,
-    fontWeight: '700',
-    lineHeight: 20,
-    flex: 1,
-  },
-  loadingContainer: {
-    height: 200,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 40,
-  },
-  emptyCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
-    padding: 48,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.gray[200],
-    shadowColor: Colors.card.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 16,
-    elevation: 3,
-  },
-  emptyTitle: {
-    ...Typography.title2,
-    color: Colors.text.primary,
-    fontWeight: '700',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    ...Typography.body,
-    color: Colors.text.secondary,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-});

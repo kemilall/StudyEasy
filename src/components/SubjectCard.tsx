@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Svg, Path } from 'react-native-svg';
 import { Subject } from '../types';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
@@ -42,6 +43,27 @@ export const SubjectCard: React.FC<SubjectCardProps> = ({ subject, onPress, onDe
       activeOpacity={0.7}
       disabled={subject.isDeleting}
     >
+      {/* Decorative Waves at Top */}
+      <View style={styles.wavesContainer}>
+        <Svg width="100%" height="40" viewBox="0 0 200 40" preserveAspectRatio="none" style={styles.waves}>
+          <Path
+            d="M0,20 Q25,10 50,20 T100,20 T150,20 T200,20 L200,0 L0,0 Z"
+            fill={subject.color}
+            opacity={0.08}
+          />
+          <Path
+            d="M0,25 Q25,15 50,25 T100,25 T150,25 T200,25 L200,0 L0,0 Z"
+            fill={subject.color}
+            opacity={0.06}
+          />
+          <Path
+            d="M0,30 Q25,20 50,30 T100,30 T150,30 T200,30 L200,0 L0,0 Z"
+            fill={subject.color}
+            opacity={0.04}
+          />
+        </Svg>
+      </View>
+
       {subject.isDeleting && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={subject.color} />
@@ -84,6 +106,20 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 3,
     position: 'relative',
+    overflow: 'hidden',
+  },
+  wavesContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 40,
+    zIndex: 0,
+  },
+  waves: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
   },
   iconContainer: {
     width: 64,
