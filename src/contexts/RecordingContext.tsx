@@ -45,12 +45,8 @@ export const RecordingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Handle app state changes (background/foreground)
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      if (nextAppState === 'background' && isRecording && !isPaused) {
-        // App going to background while recording - pause the recording
-        wasRecordingBeforeBackgroundRef.current = true;
-        pauseRecordingSession();
-      } else if (nextAppState === 'active' && wasRecordingBeforeBackgroundRef.current && !isOnRecordingScreen) {
-        // App coming back to foreground - resume recording if we were recording before
+      // Do not auto-pause on background; allow background recording.
+      if (nextAppState === 'active' && wasRecordingBeforeBackgroundRef.current && !isOnRecordingScreen) {
         wasRecordingBeforeBackgroundRef.current = false;
         resumeRecordingSession();
       }

@@ -19,6 +19,7 @@ import { useRecording } from '../contexts/RecordingContext';
 import { DataService } from '../services/dataService';
 import { FileUploadService } from '../services/fileUploadService';
 import { DoubleConfirmationModal } from '../components/DoubleConfirmationModal';
+import { LiveActivityService } from '../services/liveActivityService';
 
 interface RouteParams {
   subjectId: string;
@@ -227,6 +228,8 @@ export const RecordingStudioScreen: React.FC = () => {
             lessonName: lessonNameRef.current,
             durationMillis: 0,
           });
+          // Start Live Activity
+          await LiveActivityService.start(lessonNameRef.current, subjectName, subjectColor);
         } else if (lessonId) {
           // Resume existing session
           const existingDuration = currentSession?.durationMillis || 0;
@@ -238,6 +241,7 @@ export const RecordingStudioScreen: React.FC = () => {
             lessonName: lessonNameRef.current,
             durationMillis: existingDuration,
           });
+          await LiveActivityService.start(lessonNameRef.current, subjectName, subjectColor);
         }
       }
 
@@ -259,6 +263,7 @@ export const RecordingStudioScreen: React.FC = () => {
       setIsRecording(false);
       setIsPaused(true);
       pauseRecordingSession();
+      await LiveActivityService.update(Math.floor((currentSession?.durationMillis || 0) / 1000), true);
 
     } catch (error) {
       console.error('Failed to pause recording:', error);
@@ -267,6 +272,7 @@ export const RecordingStudioScreen: React.FC = () => {
 
   const handleResumeRecording = async () => {
     await startRecording();
+    await LiveActivityService.update(Math.floor((currentSession?.durationMillis || 0) / 1000), false);
   };
 
   const handleValidateRecording = async () => {
@@ -300,6 +306,7 @@ export const RecordingStudioScreen: React.FC = () => {
       setIsPaused(false);
 
       stopRecordingSession();
+      await LiveActivityService.stop();
 
       // Process the recording immediately
       await processRecording(uri, activeLessonId!);
