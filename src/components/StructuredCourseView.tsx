@@ -18,7 +18,6 @@ const ContentBlockComponent: React.FC<{ block: ContentBlock; index: number }> = 
       case 'text':
         return (
           <View>
-            <Text style={styles.debugLabel}>TEXT</Text>
             <Text style={styles.textBlock} selectable={true}>
               {block.content}
             </Text>
@@ -28,7 +27,6 @@ const ContentBlockComponent: React.FC<{ block: ContentBlock; index: number }> = 
       case 'example':
         return (
           <View>
-            <Text style={styles.debugLabel}>EXAMPLE</Text>
             <View style={styles.exampleBlock}>
               {block.title && <Text style={styles.blockTitle} selectable={true}>{block.title}</Text>}
               <Text style={styles.exampleContent} selectable={true}>{block.content}</Text>
@@ -101,7 +99,6 @@ const ContentBlockComponent: React.FC<{ block: ContentBlock; index: number }> = 
 
         return (
           <View>
-            <Text style={styles.debugLabel}>FORMULA</Text>
             <View style={styles.formulaBlock}>
               {block.title && <Text style={styles.blockTitle} selectable={true}>{block.title}</Text>}
               <Text style={styles.formulaContent} selectable={true}>{formattedFormula}</Text>
@@ -112,7 +109,6 @@ const ContentBlockComponent: React.FC<{ block: ContentBlock; index: number }> = 
       case 'definition':
         return (
           <View>
-            <Text style={styles.debugLabel}>DEFINITION</Text>
             <View style={styles.definitionBlock}>
               {block.title && <Text style={styles.blockTitle} selectable={true}>{block.title}</Text>}
               <Text style={styles.definitionContent} selectable={true}>{block.content}</Text>
@@ -124,7 +120,6 @@ const ContentBlockComponent: React.FC<{ block: ContentBlock; index: number }> = 
         const bulletPoints = block.content.split('\n').filter(point => point.trim());
         return (
           <View>
-            <Text style={styles.debugLabel}>BULLET_POINTS</Text>
             <View style={styles.bulletPointsBlock}>
               {block.title && <Text style={styles.blockTitle} selectable={true}>{block.title}</Text>}
               {bulletPoints.map((point, idx) => {
@@ -134,7 +129,7 @@ const ContentBlockComponent: React.FC<{ block: ContentBlock; index: number }> = 
                 <View key={idx} style={styles.bulletPoint}>
                   {isNumbered ? (
                     <>
-                      <Text style={styles.numberSymbol}>{point.match(/^\d+\./)[0]}</Text>
+                      <Text style={styles.numberSymbol}>{point.match(/^\d+\./)?.[0] || ''}</Text>
                       <Text style={styles.bulletText} selectable={true}>{point.replace(/^\d+\.\s*/, '')}</Text>
                     </>
                   ) : (
@@ -153,7 +148,6 @@ const ContentBlockComponent: React.FC<{ block: ContentBlock; index: number }> = 
       case 'summary':
         return (
           <View>
-            <Text style={styles.debugLabel}>SUMMARY</Text>
             <View style={styles.summaryBlock}>
               {block.title && <Text style={styles.blockTitle} selectable={true}>{block.title}</Text>}
               <Text style={styles.summaryContent} selectable={true}>{block.content}</Text>
@@ -164,7 +158,6 @@ const ContentBlockComponent: React.FC<{ block: ContentBlock; index: number }> = 
       default:
         return (
           <View>
-            <Text style={styles.debugLabel}>DEFAULT</Text>
             <Text style={styles.textBlock} selectable={true}>
               {block.content}
             </Text>
@@ -182,21 +175,16 @@ const ContentBlockComponent: React.FC<{ block: ContentBlock; index: number }> = 
 
 const SubsectionComponent: React.FC<{ subsection: any; index: number; isLast?: boolean }> = ({ subsection, index, isLast }) => {
   return (
-    <View>
-      <Text style={styles.debugLabel}>SUBSECTION_{index}</Text>
-      <View style={[styles.subsection, isLast && { marginBottom: 0 }]}>
-        <Text style={styles.debugLabel}>SUBSECTION_TITLE</Text>
-        <Text style={styles.subsectionTitle}>{subsection.title}</Text>
-        <Text style={styles.debugLabel}>BLOCKS_CONTAINER</Text>
-        <View style={styles.blocksContainer}>
-          {subsection.blocks.map((block: ContentBlock, blockIndex: number) => (
-            <ContentBlockComponent
-              key={blockIndex}
-              block={block}
-              index={blockIndex}
-            />
-          ))}
-        </View>
+    <View style={[styles.subsection, isLast && { marginBottom: 0 }]}>
+      <Text style={styles.subsectionTitle}>{subsection.title}</Text>
+      <View style={styles.blocksContainer}>
+        {subsection.blocks.map((block: ContentBlock, blockIndex: number) => (
+          <ContentBlockComponent
+            key={blockIndex}
+            block={block}
+            index={blockIndex}
+          />
+        ))}
       </View>
     </View>
   );
@@ -204,22 +192,17 @@ const SubsectionComponent: React.FC<{ subsection: any; index: number; isLast?: b
 
 const SectionComponent: React.FC<{ section: any; index: number }> = ({ section, index }) => {
   return (
-    <View>
-      <Text style={styles.debugLabel}>SECTION_{index}</Text>
-      <View style={styles.section}>
-        <Text style={styles.debugLabel}>SECTION_TITLE</Text>
-        <Text style={styles.sectionTitle}>{section.title}</Text>
-        <Text style={styles.debugLabel}>SUBSECTIONS_CONTAINER</Text>
-        <View style={styles.subsectionsContainer}>
-          {section.subsections.map((subsection: any, subsectionIndex: number) => (
-            <SubsectionComponent
-              key={subsectionIndex}
-              subsection={subsection}
-              index={subsectionIndex}
-              isLast={subsectionIndex === section.subsections.length - 1}
-            />
-          ))}
-        </View>
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{section.title}</Text>
+      <View style={styles.subsectionsContainer}>
+        {section.subsections.map((subsection: any, subsectionIndex: number) => (
+          <SubsectionComponent
+            key={subsectionIndex}
+            subsection={subsection}
+            index={subsectionIndex}
+            isLast={subsectionIndex === section.subsections.length - 1}
+          />
+        ))}
       </View>
     </View>
   );
@@ -235,68 +218,33 @@ export const StructuredCourseView: React.FC<StructuredCourseViewProps> = ({
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Course Title */}
       <View>
-        <Text style={styles.debugLabel}>COURSE_TITLE</Text>
         <Text style={styles.courseTitle} selectable={true}>{course.title}</Text>
       </View>
 
-      {/* Status Card */}
-      {lesson && (
-        <View style={[styles.statusCard, lesson.isCompleted && styles.completedCard]}>
-          <View style={styles.statusIcon}>
-            <Ionicons
-              name={lesson.isCompleted ? "checkmark-circle" : "time-outline"}
-              size={24}
-              color={lesson.isCompleted ? Colors.accent.green : Colors.accent.orange}
-            />
-          </View>
-          <View style={styles.statusContent}>
-            <Text style={styles.statusTitle}>
-              {lesson.isCompleted ? 'Leçon terminée' : 'En cours'}
-            </Text>
-            <Text style={styles.statusSubtitle}>
-              {lesson.duration && lesson.duration > 0 ? `${lesson.duration} minutes` : 'Durée inconnue'}
-            </Text>
-          </View>
-          {!lesson.isCompleted && onMarkComplete && (
-            <TouchableOpacity style={styles.completeButton} onPress={onMarkComplete}>
-              <Text style={styles.completeButtonText}>Terminer</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
 
       {/* Overview */}
       <View>
-        <Text style={styles.debugLabel}>OVERVIEW_CONTAINER</Text>
         <View style={styles.overviewContainer}>
-          <View style={styles.overviewContent}>
-            <Text style={styles.debugLabel}>OVERVIEW_OBJECTIVE_TITLE</Text>
-            <Text style={styles.overviewTitle} selectable={true}>Objectif du cours</Text>
-            <Text style={styles.debugLabel}>OVERVIEW_OBJECTIVE_CONTENT</Text>
-            <Text style={styles.overviewObjective} selectable={true}>{course.overview.objective}</Text>
+          <Text style={styles.overviewTitle} selectable={true}>Objectif du cours</Text>
+          <Text style={styles.overviewObjective} selectable={true}>{course.overview.objective}</Text>
 
-            {course.overview.main_ideas && course.overview.main_ideas.length > 0 && (
-              <>
-                <Text style={styles.debugLabel}>OVERVIEW_MAIN_IDEAS_TITLE</Text>
-                <Text style={styles.overviewTitle} selectable={true}>Idées principales</Text>
-                <Text style={styles.debugLabel}>OVERVIEW_MAIN_IDEAS_CONTENT</Text>
-                {course.overview.main_ideas.map((idea, index) => (
-                  <Text key={index} style={styles.mainIdea} selectable={true}>• {idea}</Text>
-                ))}
-              </>
-            )}
+          {course.overview.main_ideas && course.overview.main_ideas.length > 0 && (
+            <>
+              <Text style={styles.overviewTitle} selectable={true}>Idées principales</Text>
+              {course.overview.main_ideas.map((idea, index) => (
+                <Text key={index} style={styles.mainIdea} selectable={true}>• {idea}</Text>
+              ))}
+            </>
+          )}
 
-            {course.overview.structure && course.overview.structure.length > 0 && (
-              <>
-                <Text style={styles.debugLabel}>OVERVIEW_STRUCTURE_TITLE</Text>
-                <Text style={styles.overviewTitle} selectable={true}>Structure du cours</Text>
-                <Text style={styles.debugLabel}>OVERVIEW_STRUCTURE_CONTENT</Text>
-                {course.overview.structure.map((item, index) => (
-                  <Text key={index} style={styles.structureItem} selectable={true}>{index + 1}. {item}</Text>
-                ))}
-              </>
-            )}
-          </View>
+          {course.overview.structure && course.overview.structure.length > 0 && (
+            <>
+              <Text style={styles.overviewTitle} selectable={true}>Structure du cours</Text>
+              {course.overview.structure.map((item, index) => (
+                <Text key={index} style={styles.structureItem} selectable={true}>{index + 1}. {item}</Text>
+              ))}
+            </>
+          )}
         </View>
       </View>
 
@@ -311,30 +259,20 @@ export const StructuredCourseView: React.FC<StructuredCourseViewProps> = ({
 
       {/* Conclusion */}
       <View>
-        <Text style={styles.debugLabel}>CONCLUSION_CONTAINER</Text>
         <View style={styles.conclusionContainer}>
-          <View style={styles.conclusionInner}>
-            <Text style={styles.debugLabel}>CONCLUSION_TITLE</Text>
-            <Text style={styles.conclusionTitle} selectable={true}>Conclusion</Text>
-            <Text style={styles.debugLabel}>CONCLUSION_CONTENT</Text>
-            <Text style={styles.conclusionContent} selectable={true}>{course.conclusion}</Text>
-          </View>
+          <Text style={styles.conclusionTitle} selectable={true}>Conclusion</Text>
+          <Text style={styles.conclusionContent} selectable={true}>{course.conclusion}</Text>
         </View>
       </View>
 
       {/* References */}
       {course.references && course.references.length > 0 && (
         <View>
-          <Text style={styles.debugLabel}>REFERENCES_CONTAINER</Text>
           <View style={styles.referencesContainer}>
-            <View style={styles.referencesInner}>
-              <Text style={styles.debugLabel}>REFERENCES_TITLE</Text>
-              <Text style={styles.referencesTitle} selectable={true}>Références</Text>
-              <Text style={styles.debugLabel}>REFERENCES_CONTENT</Text>
-              {course.references.map((reference, index) => (
-                <Text key={index} style={styles.referenceItem} selectable={true}>• {reference}</Text>
-              ))}
-            </View>
+            <Text style={styles.referencesTitle} selectable={true}>Références</Text>
+            {course.references.map((reference, index) => (
+              <Text key={index} style={styles.referenceItem} selectable={true}>• {reference}</Text>
+            ))}
           </View>
         </View>
       )}
@@ -344,7 +282,7 @@ export const StructuredCourseView: React.FC<StructuredCourseViewProps> = ({
         <View style={styles.actionsGrid}>
           {lesson.transcription && (
             <TouchableOpacity
-              style={styles.actionCard}
+              style={[styles.actionCard, { borderLeftColor: Colors.accent.purple, borderLeftWidth: 4 }]}
               onPress={() => onNavigate('Transcription', { lessonId: lesson.id })}
             >
               <View style={[styles.actionIcon, { backgroundColor: Colors.accent.purple + '15' }]}>
@@ -357,7 +295,7 @@ export const StructuredCourseView: React.FC<StructuredCourseViewProps> = ({
 
           {lesson.flashcards && lesson.flashcards.length > 0 && (
             <TouchableOpacity
-              style={styles.actionCard}
+              style={[styles.actionCard, { borderLeftColor: Colors.accent.blue, borderLeftWidth: 4 }]}
               onPress={() => onNavigate('Flashcards', { lessonId: lesson.id })}
             >
               <View style={[styles.actionIcon, { backgroundColor: Colors.accent.blue + '15' }]}>
@@ -370,7 +308,7 @@ export const StructuredCourseView: React.FC<StructuredCourseViewProps> = ({
 
           {lesson.quiz && lesson.quiz.length > 0 && (
             <TouchableOpacity
-              style={styles.actionCard}
+              style={[styles.actionCard, { borderLeftColor: Colors.accent.green, borderLeftWidth: 4 }]}
               onPress={() => onNavigate('Quiz', { lessonId: lesson.id })}
             >
               <View style={[styles.actionIcon, { backgroundColor: Colors.accent.green + '15' }]}>
@@ -382,7 +320,7 @@ export const StructuredCourseView: React.FC<StructuredCourseViewProps> = ({
           )}
 
           <TouchableOpacity
-            style={styles.actionCard}
+            style={[styles.actionCard, { borderLeftColor: Colors.accent.orange, borderLeftWidth: 4 }]}
             onPress={() => onNavigate('Chat', { lessonId: lesson.id })}
           >
             <View style={[styles.actionIcon, { backgroundColor: Colors.accent.orange + '15' }]}>
@@ -402,75 +340,32 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
     paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingTop: 10,
+    paddingBottom: 20,
   },
   courseTitle: {
     fontSize: 26,
     fontWeight: '700',
     color: Colors.text.primary,
     textAlign: 'left',
-    marginBottom: 20,
+    marginBottom: -10,
     marginTop: 0,
     lineHeight: 32,
-  },
-  statusCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  completedCard: {
-    backgroundColor: Colors.accent.green + '10',
-  },
-  statusIcon: {
-    marginRight: 16,
-  },
-  statusContent: {
-    flex: 1,
-  },
-  statusTitle: {
-    ...Typography.headline,
-    color: Colors.text.primary,
-    marginBottom: 4,
-  },
-  statusSubtitle: {
-    ...Typography.subheadline,
-    color: Colors.text.secondary,
-  },
-  completeButton: {
-    backgroundColor: Colors.accent.green,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-  completeButtonText: {
-    ...Typography.subheadline,
-    color: Colors.surface,
-    fontWeight: '600',
   },
   overviewContainer: {
     backgroundColor: Colors.surface,
     marginVertical: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 0,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     borderRadius: 12,
-  },
-  overviewContent: {
-    paddingHorizontal: 20,
   },
   overviewTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.text.primary,
+    color: Colors.accent.green,
     marginTop: 12,
     marginBottom: 8,
+    marginHorizontal: -4,
     lineHeight: 24,
   },
   overviewObjective: {
@@ -500,7 +395,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.text.primary,
+    color: Colors.accent.blue,
     marginBottom: 12,
     lineHeight: 28,
   },
@@ -518,7 +413,7 @@ const styles = StyleSheet.create({
   subsectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: Colors.text.primary,
+    color: Colors.accent.green,
     marginBottom: 10,
     marginHorizontal: -4,
     lineHeight: 24,
@@ -542,7 +437,9 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   exampleBlock: {
-    backgroundColor: Colors.gray[100],
+    backgroundColor: Colors.accent.purple + '10',
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.accent.purple,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
@@ -554,7 +451,9 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   formulaBlock: {
-    backgroundColor: Colors.gray[100],
+    backgroundColor: Colors.accent.blue + '10',
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.accent.blue,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
@@ -568,7 +467,9 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   definitionBlock: {
-    backgroundColor: Colors.gray[100],
+    backgroundColor: Colors.accent.green + '10',
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.accent.green,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
@@ -580,7 +481,9 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   bulletPointsBlock: {
-    backgroundColor: Colors.gray[100],
+    backgroundColor: Colors.accent.orange + '10',
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.accent.orange,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
@@ -613,7 +516,9 @@ const styles = StyleSheet.create({
     minWidth: 24,
   },
   summaryBlock: {
-    backgroundColor: Colors.gray[100],
+    backgroundColor: Colors.accent.yellow + '10',
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.accent.yellow,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
@@ -629,17 +534,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     marginVertical: 16,
     paddingVertical: 16,
-    paddingHorizontal: 0,
+    paddingHorizontal: 8,
     borderRadius: 12,
-  },
-  conclusionInner: {
-    paddingHorizontal: 20,
   },
   conclusionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.text.primary,
+    color: Colors.accent.purple,
     marginBottom: 10,
+    marginHorizontal: -4,
     lineHeight: 28,
   },
   conclusionContent: {
@@ -651,17 +554,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     marginVertical: 16,
     paddingVertical: 16,
-    paddingHorizontal: 0,
+    paddingHorizontal: 8,
     borderRadius: 12,
-  },
-  referencesInner: {
-    paddingHorizontal: 20,
   },
   referencesTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.text.primary,
+    color: Colors.accent.orange,
     marginBottom: 10,
+    marginHorizontal: -4,
     lineHeight: 24,
   },
   referenceItem: {
@@ -708,17 +609,5 @@ const styles = StyleSheet.create({
     ...Typography.caption1,
     color: Colors.text.secondary,
     textAlign: 'center',
-  },
-  debugLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.accent.red,
-    backgroundColor: Colors.accent.yellow,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-    marginBottom: 4,
-    letterSpacing: 0.5,
   },
 });

@@ -245,8 +245,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 16,
+    paddingTop: 10,
+    paddingBottom: 1
+    ,
     backgroundColor: Colors.surface,
   },
   headerBackButton: {
