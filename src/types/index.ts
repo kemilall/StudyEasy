@@ -30,6 +30,7 @@ export interface Lesson {
   keyPoints?: string[];
   flashcards?: Flashcard[];
   quiz?: QuizQuestion[];
+  course?: StructuredCourse | LegacyStructuredCourse; // New structured course data
   subjectId: string;
   userId: string;
   createdAt: Date;
@@ -70,7 +71,47 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
-// Content block types for structured courses
+// New content types for structured courses (French backend format)
+export interface ContentItem {
+  type: 'texte' | 'formule' | 'mindmap' | 'definition' | 'exemple' | 'sous-section';
+  valeur?: string;
+  titre?: string;
+  contenu?: ContentItem[];
+}
+
+export interface CourseSection {
+  titre: string;
+  contenu: ContentItem[];
+}
+
+export interface CourseIntroduction {
+  texte: string;
+}
+
+export interface CourseConclusion {
+  texte: string;
+}
+
+export interface CourseReference {
+  type?: 'livre' | 'article' | 'video' | 'site';
+  titre: string;
+  auteur?: string;
+  annee?: number;
+  editeur?: string;
+  lien?: string;
+}
+
+export interface StructuredCourse {
+  titre_cours: string;
+  description: string;
+  introduction: CourseIntroduction;
+  plan: string[];
+  sections: CourseSection[];
+  conclusion: CourseConclusion;
+  references: CourseReference[];
+}
+
+// Legacy content block types (for backward compatibility)
 export interface ContentBlock {
   type: 'text' | 'example' | 'formula' | 'definition' | 'bullet_points' | 'summary';
   content: string;
@@ -93,7 +134,7 @@ export interface CourseOverview {
   structure: string[];
 }
 
-export interface StructuredCourse {
+export interface LegacyStructuredCourse {
   title: string;
   overview: CourseOverview;
   sections: Section[];
@@ -113,7 +154,7 @@ export interface SimpleCourse {
 // API Response types
 export interface ProcessedChapterResponse {
   transcription: string;
-  course: StructuredCourse | SimpleCourse; // Support both new and legacy formats
+  course: StructuredCourse | LegacyStructuredCourse | SimpleCourse; // Support new, legacy and simple formats
   flashcards: Array<{
     term: string;
     definition: string;

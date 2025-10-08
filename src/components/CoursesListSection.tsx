@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   ActivityIndicator,
-  FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
@@ -254,15 +253,13 @@ export const CoursesListSection: React.FC<CoursesListSectionProps> = ({
       ) : courses.length === 0 ? (
         renderEmptyState()
       ) : (
-        <FlatList
-          data={courses}
-          renderItem={renderCourseItem}
-          keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingBottom: 20,
-          }}
-        />
+        <View style={{ paddingBottom: 20 }}>
+          {courses.map((item) => (
+            <View key={item.id}>
+              {renderCourseItem({ item })}
+            </View>
+          ))}
+        </View>
       )}
     </View>
   );

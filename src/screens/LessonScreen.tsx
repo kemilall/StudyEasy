@@ -56,11 +56,20 @@ export const LessonScreen: React.FC = () => {
             console.error('Error fetching subject info:', subjectError);
           }
 
-          // Try to parse structured course from lesson data
-          if (lessonData.content) {
+          // Try to get structured course from lesson data
+          if (lessonData.course) {
+            // Course data already parsed
+            setStructuredCourse(lessonData.course as StructuredCourse);
+          } else if (lessonData.content) {
+            // Try to parse from content field for backward compatibility
             try {
               const parsedCourse = JSON.parse(lessonData.content);
-              if (parsedCourse.overview && parsedCourse.sections) {
+              // Check for new structure (French field names)
+              if (parsedCourse.titre_cours && parsedCourse.sections) {
+                setStructuredCourse(parsedCourse as StructuredCourse);
+              }
+              // Check for old structure
+              else if (parsedCourse.overview && parsedCourse.sections) {
                 setStructuredCourse(parsedCourse as StructuredCourse);
               }
             } catch (parseError) {

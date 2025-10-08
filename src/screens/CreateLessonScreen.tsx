@@ -9,7 +9,6 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  FlatList,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -141,13 +140,13 @@ export const CreateLessonScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
             ) : (
-              <FlatList
-                data={subjects}
-                renderItem={renderSubjectItem}
-                keyExtractor={(item) => item.id}
-                scrollEnabled={false}
-                contentContainerStyle={styles.subjectsList}
-              />
+              <View style={styles.subjectsList}>
+                {subjects.map((item) => (
+                  <View key={item.id}>
+                    {renderSubjectItem({ item })}
+                  </View>
+                ))}
+              </View>
             )}
           </View>
         )}

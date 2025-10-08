@@ -135,15 +135,13 @@ class AIService:
             logger.info(f"Text length: {len(text)} characters")
 
             # Run all AI generations in parallel
-            logger.info("Creating parallel tasks for: course, flashcards, quiz, key_points, summary")
+            logger.info("Creating parallel tasks for: course, flashcards, quiz")
             start_time = asyncio.get_event_loop().time()
 
             tasks = [
                 self.generate_structured_course(text, chapter_name, lesson_name, subject_name),
                 self.generate_flashcards(text),
-                self.generate_quiz(text),
-                self._extract_key_points(text),
-                self._generate_summary(text)
+                self.generate_quiz(text)
             ]
 
             logger.info("Starting parallel execution with asyncio.gather...")
@@ -153,15 +151,13 @@ class AIService:
             total_time = end_time - start_time
             logger.info(f"=== PARALLEL PROCESSING COMPLETED ===")
             logger.info(f"Total execution time: {total_time:.2f} seconds")
-            logger.info(f"Results: course={type(results[0])}, flashcards={len(results[1])}, quiz={len(results[2])}, key_points={len(results[3])}, summary={len(results[4])} chars")
+            logger.info(f"Results: course={type(results[0])}, flashcards={len(results[1])}, quiz={len(results[2])}")
 
             return ProcessedChapter(
                 transcription=text,
                 course=results[0],
                 flashcards=results[1],
-                quiz=results[2],
-                key_points=results[3],
-                summary=results[4]
+                quiz=results[2]
             )
 
         except Exception as e:
@@ -175,7 +171,7 @@ class AIService:
         lesson_name: str,
         subject_name: str
     ) -> StructuredCourse:
-        """Generate a comprehensive structured course from input text using GPT-4.1"""
+        """Generate a comprehensive structured course from input text using GPT-5"""
         try:
             if self.client is None:
                 raise ValueError("OPENAI_API_KEY not set; content generation requires OpenAI.")
@@ -187,68 +183,153 @@ class AIService:
                     input=[
                         {
                             "role": "developer",
-                            "content": """You are an expert educational content creator designed to output JSON. Transform the provided text into a comprehensive, well-structured course with detailed sections and subsections.
+                            "content": """Tu dois uniquement répondre au format JSON décrit ci-dessous, sans ajouter ni modifier la structure.
+Tu ne dois pas inventer de nouveaux champs ou formats.
 
-CRITICAL REQUIREMENTS:
-- Preserve ALL essential information from the source material
-- Create a complete, structured course that covers everything
-- Organize content logically with clear sections and subsections
-- Use different content block types: 'text', 'example', 'formula', 'definition', 'bullet_points', 'summary'
-- Include mathematical formulas in proper LaTeX format when needed
-- Each subsection should contain multiple content blocks of various types
-- Ensure nothing important is lost
+Le JSON doit contenir : titre_cours, description, introduction, plan, sections, conclusion, et references.
 
-Return a JSON object with this exact structure:
+Les champs sections et sous-sections contiennent une liste d'éléments dans le champ contenu.
+
+Chaque élément de contenu doit avoir un champ "type" parmi :
+"texte", "formule", "mindmap", "definition", "exemple", "sous-section".
+
+Les formules mathématiques doivent être écrites en LaTeX entre $$ ... $$.
+
+Les schémas mentaux doivent être en Mermaid (dans un bloc triple backticks avec le mot mermaid).
+
+Le texte peut contenir du gras (**texte**), des italiques (*texte*), des listes à puces (-) ou numérotées (1.).
+
+RETOURS À LA LIGNE : Utilise \n pour créer des retours à la ligne dans le texte. Exemple :
+"Première ligne\n\nDeuxième ligne après un saut\n- Liste à puces\n- Deuxième élément"
+
+Tu peux imbriquer librement texte, exemples, formules et définitions dans une section.
+
+Les références doivent être une liste d'objets contenant au minimum un titre et un lien ou un auteur.
+
 {
-  "title": "string - the main course title",
-  "overview": {
-    "objective": "string - main learning objective",
-    "main_ideas": ["array", "of", "key", "concepts"],
-    "structure": ["array", "of", "section", "titles"]
+  "titre_cours": "Titre du cours",
+  "description": "Brève présentation du cours (quel est le thème, le public visé, les objectifs, etc.)",
+  "introduction": {
+    "texte": "Texte d'introduction libre pouvant contenir du **gras**, des listes à puces, ou des listes numérotées."
   },
+  "plan": [
+    "Titre de la section 1",
+    "Titre de la section 2",
+    "Titre de la section 3"
+  ],
   "sections": [
     {
-      "title": "string - section title",
-      "subsections": [
+      "titre": "Titre de la section",
+      "contenu": [
         {
-          "title": "string - subsection title",
-          "blocks": [
+          "type": "texte",
+          "valeur": "Texte libre pouvant contenir du **gras**, des listes à puces, des listes numérotées, etc."
+        },
+        {
+          "type": "sous-section",
+          "titre": "Titre de la sous-section",
+          "contenu": [
             {
-              "type": "text|example|formula|definition|bullet_points|summary",
-              "content": "string - the actual content",
-              "title": "string - optional title for the block"
+              "type": "texte",
+              "valeur": "Texte descriptif ou explicatif."
+            },
+            {
+              "type": "formule",
+              "valeur": "$$E = mc^2$$"
+            },
+            {
+              "type": "exemple",
+              "valeur": "Exemple concret ou mise en situation illustrant le concept."
+            },
+            {
+              "type": "definition",
+              "titre": "Fonction mathématique",
+              "valeur": "Une fonction est une relation qui associe à chaque élément d'un ensemble de départ (domaine) une unique valeur d'un ensemble d'arrivée (codomaine).\n\n**Notation :** f: A → B\n**Propriété :** Pour tout x ∈ A, il existe un unique y ∈ B tel que f(x) = y"
+            },
+            {
+              "type": "mindmap",
+              "valeur": "```mermaid\nmindmap\n  root((Concept principal))\n    Sous-partie A\n    Sous-partie B\n```"
             }
           ]
+        },
+        {
+          "type": "formule",
+          "valeur": "$$\\int_a^b f(x)dx = F(b) - F(a)$$"
+        },
+        {
+          "type": "exemple",
+          "valeur": "Exemple illustrant la formule précédente."
         }
       ]
     }
   ],
-  "conclusion": "string - comprehensive final summary",
-  "references": ["array", "of", "references", "if", "applicable"]
-}
-
-CONTENT BLOCK TYPES:
-- 'text': Regular explanatory text
-- 'example': Examples, case studies, or practical applications
-- 'formula': Mathematical formulas in LaTeX format (e.g., "E = mc²", "\\frac{d}{dx}\\int_a^b f(x)dx")
-- 'definition': Key definitions and concepts
-- 'bullet_points': Lists of key points, steps, or features
-- 'summary': Summary of the subsection content
-
-Make the course comprehensive and educational."""
+  "conclusion": {
+    "texte": "Texte de conclusion récapitulant les idées principales et ouvrant sur d'autres perspectives."
+  },
+  "references": [
+    {
+      "type": "livre",
+      "titre": "Nom du livre",
+      "auteur": "Auteur",
+      "annee": 2021,
+      "editeur": "Maison d'édition"
+    },
+    {
+      "type": "article",
+      "titre": "Titre de l'article",
+      "lien": "https://exemple.com"
+    }
+  ]
+}"""
                         },
                         {
                             "role": "user",
-                            "content": f"""Create a comprehensive structured course from this content:
+                            "content": f"""Transforme ce contenu en cours structuré en respectant EXACTEMENT le format JSON spécifié:
 
-Subject: {subject_name}
-Lesson: {lesson_name}
-Chapter: {chapter_name}
+Matière: {subject_name}
+Leçon: {lesson_name}
+Chapitre: {chapter_name}
 
-Content:
+Contenu brut:
 {text}
 
-Transform this into a complete, detailed course structure with sections, subsections, and various content block types. Ensure ALL information is preserved and organized logically."""
+INSTRUCTIONS CRITIQUES:
+1. FILTRAGE DU CONTENU:
+   - IGNORE complètement les salutations ("bonjour", "bonsoir", etc.)
+   - IGNORE les références temporelles ("aujourd'hui", "hier", "demain", "cette semaine", etc.)
+   - IGNORE les références personnelles ("je", "nous", "mon professeur", "changement de prof", etc.)
+   - IGNORE les références au planning ou à l'organisation du cours
+   - IGNORE les éléments de contexte scolaire (absences, changements d'horaire, etc.)
+   - FOCUS uniquement sur le CONTENU ACADÉMIQUE pur
+
+2. CONTENU À CONSERVER:
+   - Concepts théoriques et définitions
+   - Formules et équations
+   - Exemples concrets et applications
+   - Méthodes et procédures
+   - Données factuelles et scientifiques
+
+3. GÉNÉRATION:
+   - Génère un cours complet et détaillé
+   - Organise le contenu de manière logique et intemporelle
+   - Utilise tous les types de contenu appropriés (texte, formule, exemple, definition, mindmap, sous-section)
+   - Les formules mathématiques doivent être en LaTeX entre $$...$$
+   - Les mindmaps doivent être en format Mermaid
+   - Écris dans un style académique neutre et intemporel
+
+4. FORMAT SPÉCIFIQUE DES DÉFINITIONS:
+   - Toujours inclure un "titre" clair pour la définition
+   - Structure la "valeur" avec : définition principale + détails/propriétés
+   - Utilise des retours à la ligne (\n) pour séparer les parties
+   - Utilise le gras (**texte**) pour les mots-clés importants
+   - Exemple de structure :
+     "titre": "Nom du concept"
+     "valeur": "Définition principale.\n\n**Propriétés :**\n- Propriété 1\n- Propriété 2\n\n**Notation :** symboles mathématiques"
+
+5. RETOURS À LA LIGNE:
+   - Utilise \n pour les retours à la ligne simples
+   - Utilise \n\n pour créer des paragraphes séparés
+   - Dans les listes, chaque élément sur une nouvelle ligne avec \n"""
                         }
                     ],
                     text={
@@ -465,78 +546,3 @@ If asked about something not in the course, politely redirect to the course mate
             logger.error(f"Chat error: {str(e)}")
             raise
     
-    async def _extract_key_points(self, text: str) -> List[str]:
-        """Extract key points from text"""
-        try:
-            if self.client is None:
-                raise ValueError("OPENAI_API_KEY not set; key point extraction requires OpenAI.")
-            logger.info(f"[PARALLEL] Starting key points extraction")
-            def _extract():
-                response = self.client.responses.create(
-                    model="gpt-4.1",
-                    input=[
-                        {
-                            "role": "developer",
-                            "content": "Extract 5-10 key points from the text designed to output JSON. Each point should be concise and capture essential information. Return a JSON array of strings."
-                        },
-                        {
-                            "role": "user",
-                            "content": text
-                        }
-                    ],
-                    text={"format": {"type": "json_object"}}
-                )
-
-                import json
-                key_points_data = json.loads(response.output_text)
-                if isinstance(key_points_data, dict):
-                    # If it's a dict, try to find the key_points in it
-                    if 'key_points' in key_points_data:
-                        return key_points_data['key_points']
-                    elif 'points' in key_points_data:
-                        return key_points_data['points']
-                    else:
-                        # If it's a dict with other keys, try to extract values
-                        return list(key_points_data.values())
-                return key_points_data
-
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(self.executor, _extract)
-            logger.info(f"[PARALLEL] Key points extraction completed: {len(result)} points")
-            return result
-
-        except Exception as e:
-            logger.error(f"Key points extraction error: {str(e)}")
-            raise
-    
-    async def _generate_summary(self, text: str) -> str:
-        """Generate a comprehensive summary"""
-        try:
-            if self.client is None:
-                raise ValueError("OPENAI_API_KEY not set; summarization requires OpenAI.")
-            logger.info(f"[PARALLEL] Starting summary generation")
-            def _summarize():
-                response = self.client.responses.create(
-                    model="gpt-4.1",
-                    input=[
-                        {
-                            "role": "developer",
-                            "content": "Create a comprehensive summary that captures all important information from the text."
-                        },
-                        {
-                            "role": "user",
-                            "content": text
-                        }
-                    ]
-                )
-
-                return response.output_text
-
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(self.executor, _summarize)
-            logger.info(f"[PARALLEL] Summary generation completed: {len(result)} characters")
-            return result
-
-        except Exception as e:
-            logger.error(f"Summary generation error: {str(e)}")
-            raise

@@ -1,6 +1,6 @@
 // Pour le développement, utiliser l'IP locale de votre machine
 // Remplacez cette IP par celle de votre machine (trouvée avec ifconfig)
-const LOCAL_IP = '192.168.1.118';
+const LOCAL_IP = '192.168.1.168';
 
 export const API_BASE_URL = __DEV__
   ? `http://${LOCAL_IP}:8000`
