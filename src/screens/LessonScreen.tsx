@@ -7,15 +7,23 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Share,
+  ImageBackground,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { SvgXml } from 'react-native-svg';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { useAuth } from '../contexts/AuthContext';
 import { DataService } from '../services/dataService';
 import { Lesson, StructuredCourse } from '../types';
 import { StructuredCourseView } from '../components/StructuredCourseView';
+
+const BackgroundWavesImage = require('../../assets/background_waves.png');
+
+const BrainLogoSvg = `<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="68.0478 80.168 363.9044 339.6639" width="363.904px" height="339.664px" preserveAspectRatio="none"><defs><linearGradient id="gradient_0" gradientUnits="userSpaceOnUse" x1="581.20789" y1="481.94135" x2="413.09717" y2="239.49858" gradientTransform="matrix(1, 0, 0, 1, -260.599213, -134.646912)"><stop offset="0" stop-color="#B0C1FF"/><stop offset="1" stop-color="#CFC5FF"/></linearGradient></defs><g transform="matrix(1, 0, 0, 1, 4.847660064697266, -0.5631560683249859)" id="object-0"><path fill="url(#gradient_0)" d="M 235.311 81.063 C 237.676 80.793 242.221 80.763 244.756 80.733 C 295.886 80.513 345.069 100.333 381.757 135.943 C 418.046 171.752 448.624 243.468 407.258 287.548 C 396.851 298.638 381.07 303.78 366.346 305.923 C 322.65 312.282 284.188 290.958 246.258 273.029 C 225.308 263.048 204.995 255.564 181.425 256.368 C 159.452 257.117 147.297 264.696 130.517 277.684 C 119.426 286.27 103.274 302.427 88.641 301.861 C 65.838 300.98 62.284 268.823 63.373 251.696 C 63.648 247.412 64.12 236.827 67.69 233.799 C 68.343 233.246 78.603 232.388 80.501 232.109 C 83.528 231.642 86.509 230.916 89.411 229.939 C 106.209 224.37 129.731 202.902 142.624 191.103 C 181.94 155.244 230.71 157.881 274.48 184.641 C 298.767 199.49 323.714 220.904 354.425 213.137 C 365.149 210.426 372.214 204.125 377.568 194.771 C 361.084 202.03 349.771 201.403 332.949 195.329 C 309.894 187.004 294.955 168.992 274.075 157.259 C 255.913 146.947 235.281 141.787 214.403 142.334 C 176.238 143.185 148.179 163.174 121.963 188.277 C 112.409 197.425 99.749 208.081 86.97 211.412 C 83.804 212.237 74.292 214.114 71.226 212.171 C 70.488 211.736 69.648 209.801 69.778 208.941 C 73.086 187.201 92.097 158.497 105.996 142.88 C 140.264 104.376 184.563 84.583 235.311 81.063 Z" style="stroke-width: 1;"/><path fill="#B5C2FE" d="M 182.875 280.559 C 220.846 276.161 249.755 300.45 284.248 309.81 C 290.845 311.6 302.498 311.315 309.494 311.374 C 300.981 321.295 284.729 325.611 272.697 332.078 C 246.162 346.34 228.641 368.591 212.973 393.644 C 209.338 399.192 206.431 405.258 202.982 410.921 C 195.127 423.818 184.289 422.47 174.193 413.337 C 176.137 403.166 182.51 393.721 180.389 381.653 C 179.871 378.707 178.247 373.688 176.002 371.771 C 162.087 360.223 141.951 364.154 127.452 352.948 C 112.235 341.187 118.903 320.364 129.367 307.864 C 143.315 291.201 161.358 282.656 182.875 280.559 Z" style="stroke-width: 1;"/></g></svg>`;
 
 export const LessonScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -34,19 +42,34 @@ export const LessonScreen: React.FC = () => {
       try {
         const lessonData = await DataService.getLesson(lessonId);
 
-        // Try to parse structured course from lesson data
-        if (lessonData.content) {
+        if (lessonData) {
+          // Fetch subject information to enrich the lesson
           try {
-            const parsedCourse = JSON.parse(lessonData.content);
-            if (parsedCourse.overview && parsedCourse.sections) {
-              setStructuredCourse(parsedCourse as StructuredCourse);
+            const subjects = await DataService.getUserSubjects(user.uid);
+            const subject = subjects.find(s => s.id === lessonData.subjectId);
+            
+            if (subject) {
+              lessonData.subjectName = subject.name;
+              lessonData.subjectColor = subject.color;
             }
-          } catch (parseError) {
-            console.log('Could not parse structured course from content');
+          } catch (subjectError) {
+            console.error('Error fetching subject info:', subjectError);
           }
-        }
 
-        setLesson(lessonData);
+          // Try to parse structured course from lesson data
+          if (lessonData.content) {
+            try {
+              const parsedCourse = JSON.parse(lessonData.content);
+              if (parsedCourse.overview && parsedCourse.sections) {
+                setStructuredCourse(parsedCourse as StructuredCourse);
+              }
+            } catch (parseError) {
+              console.log('Could not parse structured course from content');
+            }
+          }
+
+          setLesson(lessonData);
+        }
         setIsLoading(false);
       } catch (error) {
         console.error('Error loading lesson:', error);
@@ -65,6 +88,16 @@ export const LessonScreen: React.FC = () => {
       setLesson({ ...lesson, isCompleted: true });
     } catch (error) {
       console.error('Error marking lesson as completed:', error);
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Check out this lesson: ${lesson?.name || 'StudyEasy Lesson'}`,
+      });
+    } catch (error) {
+      console.error('Error sharing:', error);
     }
   };
 
@@ -97,17 +130,34 @@ export const LessonScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.headerBackButton}
-        >
-          <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{lesson.name}</Text>
-        <View style={styles.headerRight} />
-      </View>
+    <View style={styles.mainWrapper}>
+      {/* Background decorative waves */}
+      <ImageBackground
+        source={BackgroundWavesImage}
+        style={styles.backgroundWaves}
+        resizeMode="cover"
+        imageStyle={{
+          opacity: 0.15,
+        }}
+      />
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.headerBackButton}
+          >
+            <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+          </TouchableOpacity>
+          <View style={styles.headerCenter}>
+            <SvgXml xml={BrainLogoSvg} width={32} height={32} />
+          </View>
+          <TouchableOpacity
+            onPress={handleShare}
+            style={styles.headerShareButton}
+          >
+            <Ionicons name="share-outline" size={24} color={Colors.text.primary} />
+          </TouchableOpacity>
+        </View>
 
       {lesson.status === 'draft' ? (
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -231,39 +281,54 @@ export const LessonScreen: React.FC = () => {
           </View>
         </ScrollView>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  mainWrapper: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+  },
+  backgroundWaves: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: 1
-    ,
-    backgroundColor: Colors.surface,
+    paddingBottom: 10,
+    backgroundColor: 'transparent',
   },
   headerBackButton: {
     width: 40,
     height: 40,
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  headerTitle: {
-    ...Typography.headline,
-    color: Colors.text.primary,
+  headerCenter: {
     flex: 1,
-    textAlign: 'center',
-    marginHorizontal: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  headerRight: {
+  headerShareButton: {
     width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   content: {
     flex: 1,
