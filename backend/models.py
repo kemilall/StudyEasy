@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 from datetime import datetime
 
 # Request Models
@@ -38,6 +38,40 @@ class QuizQuestion(BaseModel):
     correct_answer: int = Field(description="Index of the correct answer (0-2)", ge=0, le=2)
     explanation: str = Field(description="Explanation of why the answer is correct")
 
+class CourseIntroduction(BaseModel):
+    texte: str = Field(description="Introduction text of the course")
+
+class CourseConclusion(BaseModel):
+    texte: str = Field(description="Conclusion text of the course")
+
+class CourseReference(BaseModel):
+    type: Optional[str] = Field(None, description="Type of reference: livre, article, video, site")
+    titre: str = Field(description="Title of the reference")
+    auteur: Optional[str] = Field(None, description="Author of the reference")
+    annee: Optional[int] = Field(None, description="Year of publication")
+    editeur: Optional[str] = Field(None, description="Publisher")
+    lien: Optional[str] = Field(None, description="URL link")
+
+class ContentItem(BaseModel):
+    type: str = Field(description="Type of content: texte, formule, mindmap, definition, exemple, sous-section")
+    valeur: Optional[str] = Field(None, description="Content value")
+    titre: Optional[str] = Field(None, description="Optional title")
+    contenu: Optional[List[dict]] = Field(None, description="Nested content items")  # Use dict to avoid circular reference
+
+class CourseSection(BaseModel):
+    titre: str = Field(description="Title of the section")
+    contenu: List[ContentItem] = Field(description="Content items in this section")
+
+class StructuredCourse(BaseModel):
+    titre_cours: str = Field(description="Main title of the course")
+    description: str = Field(description="Course description")
+    introduction: CourseIntroduction = Field(description="Course introduction")
+    plan: List[str] = Field(description="Course outline")
+    sections: List[CourseSection] = Field(description="Main sections of the course")
+    conclusion: CourseConclusion = Field(description="Course conclusion")
+    references: List[CourseReference] = Field(default_factory=list, description="References and sources")
+
+# Legacy model for backward compatibility
 class CourseOverview(BaseModel):
     objective: str = Field(description="The main learning objective of the course")
     main_ideas: List[str] = Field(description="Key concepts that will be covered")
@@ -56,14 +90,13 @@ class Section(BaseModel):
     title: str = Field(description="Title of the main section")
     subsections: List[Subsection] = Field(description="Subsections within this section")
 
-class StructuredCourse(BaseModel):
+class LegacyStructuredCourse(BaseModel):
     title: str = Field(description="Main title of the course")
     overview: CourseOverview = Field(description="Course overview with objectives and structure")
     sections: List[Section] = Field(description="Main sections of the course")
     conclusion: str = Field(description="Final summary of the course")
     references: List[str] = Field(default_factory=list, description="References and sources if applicable")
 
-# Legacy model for backward compatibility
 class SimpleStructuredCourse(BaseModel):
     title: str = Field(description="Title of the course section")
     introduction: str = Field(description="Brief introduction to the topic")
@@ -77,8 +110,8 @@ class ChatResponse(BaseModel):
 
 class ProcessedChapter(BaseModel):
     transcription: str
-    course: StructuredCourse
+    course: Union[StructuredCourse, LegacyStructuredCourse, SimpleStructuredCourse]  # Support multiple course formats
     flashcards: List[Flashcard]
     quiz: List[QuizQuestion]
-    key_points: List[str]
-    summary: str
+    key_points: List[str] = Field(default_factory=list)  # Optional with empty list default
+    summary: str = Field(default="")

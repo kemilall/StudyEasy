@@ -12,6 +12,91 @@ interface StructuredCourseViewProps {
   onNavigate?: (screen: string, params?: any) => void;
 }
 
+// Component to visualize Mermaid mindmap syntax as a structured view
+const MindmapVisualizer: React.FC<{ mermaidCode: string }> = ({ mermaidCode }) => {
+  const parseMindmap = (code: string) => {
+    const lines = code.split('\n').filter(line => line.trim());
+    const nodes: { text: string; level: number; isRoot?: boolean }[] = [];
+    
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      
+      // Skip the "mindmap" declaration
+      if (trimmed === 'mindmap') return;
+      
+      // Count indentation level
+      const indentLevel = line.search(/\S/);
+      
+      // Extract text from different node formats
+      let text = '';
+      let isRoot = false;
+      
+      // Root node with (( ))
+      if (trimmed.match(/^\(\(.*\)\)$/)) {
+        text = trimmed.replace(/^\(\(/, '').replace(/\)\)$/, '');
+        isRoot = true;
+      }
+      // Root node with root(( ))
+      else if (trimmed.match(/^root\(\(.*\)\)$/)) {
+        text = trimmed.replace(/^root\(\(/, '').replace(/\)\)$/, '');
+        isRoot = true;
+      }
+      // Regular node
+      else {
+        text = trimmed;
+      }
+      
+      if (text) {
+        nodes.push({ text, level: indentLevel / 2, isRoot });
+      }
+    });
+    
+    return nodes;
+  };
+  
+  const nodes = parseMindmap(mermaidCode);
+  
+  if (nodes.length === 0) {
+    // Fallback to showing the code if parsing fails
+    return (
+      <View style={styles.mindmapContent}>
+        <Text style={styles.mindmapLabel}>Diagramme Mental:</Text>
+        <Text style={styles.mindmapCode}>{mermaidCode}</Text>
+      </View>
+    );
+  }
+  
+  return (
+    <View style={styles.mindmapContainer}>
+      {nodes.map((node, index) => (
+        <View
+          key={index}
+          style={[
+            styles.mindmapNode,
+            node.isRoot && styles.mindmapRootNode,
+            { marginLeft: node.level * 24 }
+          ]}
+        >
+          {!node.isRoot && node.level > 0 && (
+            <View style={styles.mindmapConnector} />
+          )}
+          <View style={[
+            styles.mindmapNodeContent,
+            node.isRoot && styles.mindmapRootContent
+          ]}>
+            <Text style={[
+              styles.mindmapNodeText,
+              node.isRoot && styles.mindmapRootText
+            ]}>
+              {node.text}
+            </Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+};
+
 // Component to render formatted text with bold, italic, and list support
 const FormattedText: React.FC<{ text: string; style?: any }> = ({ text, style }) => {
   // Check if text contains lists
@@ -69,35 +154,137 @@ const FormattedText: React.FC<{ text: string; style?: any }> = ({ text, style })
   return <FormattedTextInline text={text} style={style} />;
 };
 
-// Component for inline text formatting (bold/italic) with proper line breaks
+// Component for definition formatting (Term: Definition)
+const DefinitionText: React.FC<{ text: string; style?: any }> = ({ text, style }) => {
+  // Check if text contains a colon pattern for "Term : Definition"
+  const colonMatch = text.match(/^([^:]+):\s*(.+)$/s);
+  
+  if (colonMatch) {
+    const [, term, definition] = colonMatch;
+    return (
+      <Text style={style} selectable={true}>
+        <Text style={{ color: Colors.accentGreen, fontWeight: '600' }}>
+          {term.trim()}
+        </Text>
+        <Text> : </Text>
+        <FormattedTextInline text={definition.trim()} style={style} />
+      </Text>
+    );
+  }
+  
+  // If no colon pattern, just use regular formatting
+  return <FormattedText text={text} style={style} />;
+};
 const FormattedTextInline: React.FC<{ text: string; style?: any }> = ({ text, style }) => {
   // Split text by line breaks first
   const lines = text.split('\n');
   
   if (lines.length === 1) {
-    // Single line - handle inline formatting only
-    const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+    // Single line - handle inline formatting and formulas
+    // Split by formulas first, then by formatting
+    const formulaParts = text.split(/(\$[^$]+\$)/g);
     
     return (
       <Text style={style} selectable={true}>
-        {parts.map((part, index) => {
-          if (part.startsWith('**') && part.endsWith('**')) {
-            // Bold text
+        {formulaParts.map((formulaPart, formulaIndex) => {
+          // Check if this is a formula
+          if (formulaPart.startsWith('$') && formulaPart.endsWith('$') && formulaPart.length > 2) {
+            const formula = formulaPart.slice(1, -1)
+              // Greek letters
+              .replace(/\\alpha/g, 'α')
+              .replace(/\\beta/g, 'β')
+              .replace(/\\gamma/g, 'γ')
+              .replace(/\\delta/g, 'δ')
+              .replace(/\\epsilon/g, 'ε')
+              .replace(/\\sigma/g, 'σ')
+              .replace(/\\mu/g, 'μ')
+              .replace(/\\pi/g, 'π')
+              .replace(/\\theta/g, 'θ')
+              .replace(/\\lambda/g, 'λ')
+              .replace(/\\omega/g, 'ω')
+              .replace(/\\phi/g, 'φ')
+              // Arrows
+              .replace(/\\rightarrow/g, '→')
+              .replace(/\\leftarrow/g, '←')
+              .replace(/\\Rightarrow/g, '⇒')
+              .replace(/\\leftrightarrow/g, '↔')
+              // Math operators
+              .replace(/\\times/g, '×')
+              .replace(/\\div/g, '÷')
+              .replace(/\\pm/g, '±')
+              .replace(/\\approx/g, '≈')
+              .replace(/\\neq/g, '≠')
+              .replace(/\\leq/g, '≤')
+              .replace(/\\geq/g, '≥')
+              .replace(/\\infty/g, '∞')
+              // Common functions
+              .replace(/\\sqrt\{([^}]+)\}/g, '√($1)')
+              .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1)/($2)')
+              .replace(/\\sum/g, '∑')
+              .replace(/\\int/g, '∫')
+              .replace(/\\partial/g, '∂')
+              // Chemical notation - charges
+              .replace(/\^(\+)/g, '⁺')
+              .replace(/\^(\-)/g, '⁻')
+              // Superscripts for powers (single digits)
+              .replace(/\^0/g, '⁰')
+              .replace(/\^1/g, '¹')
+              .replace(/\^2/g, '²')
+              .replace(/\^3/g, '³')
+              .replace(/\^4/g, '⁴')
+              .replace(/\^5/g, '⁵')
+              .replace(/\^6/g, '⁶')
+              .replace(/\^7/g, '⁷')
+              .replace(/\^8/g, '⁸')
+              .replace(/\^9/g, '⁹')
+              // Subscripts for chemical formulas (single digits)
+              .replace(/_0/g, '₀')
+              .replace(/_1/g, '₁')
+              .replace(/_2/g, '₂')
+              .replace(/_3/g, '₃')
+              .replace(/_4/g, '₄')
+              .replace(/_5/g, '₅')
+              .replace(/_6/g, '₆')
+              .replace(/_7/g, '₇')
+              .replace(/_8/g, '₈')
+              .replace(/_9/g, '₉');
+            
             return (
-              <Text key={index} style={{ fontWeight: '700' }}>
-                {part.slice(2, -2)}
-              </Text>
-            );
-          } else if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
-            // Italic text
-            return (
-              <Text key={index} style={{ fontStyle: 'italic' }}>
-                {part.slice(1, -1)}
+              <Text key={`formula-${formulaIndex}`} style={{ 
+                fontFamily: 'Courier', 
+                backgroundColor: Colors.primaryBlue + '10',
+                paddingHorizontal: 4,
+                borderRadius: 4,
+                color: Colors.primaryBlue,
+                fontWeight: '600'
+              }}>
+                {formula}
               </Text>
             );
           }
-          return part;
-        })}
+          
+          // Not a formula, handle bold/italic formatting
+          const parts = formulaPart.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+          
+          return parts.map((part, index) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+              // Bold text
+              return (
+                <Text key={`${formulaIndex}-${index}`} style={{ fontWeight: '700' }}>
+                  {part.slice(2, -2)}
+                </Text>
+              );
+            } else if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
+              // Italic text
+              return (
+                <Text key={`${formulaIndex}-${index}`} style={{ fontStyle: 'italic' }}>
+                  {part.slice(1, -1)}
+                </Text>
+              );
+            }
+            return <Text key={`${formulaIndex}-${index}`}>{part}</Text>;
+          });
+        }).flat()}
       </Text>
     );
   }
@@ -111,29 +298,110 @@ const FormattedTextInline: React.FC<{ text: string; style?: any }> = ({ text, st
           return <View key={lineIndex} style={{ height: 8 }} />;
         }
         
-        // Process formatting for this line
-        const parts = line.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+        // Process formulas and formatting for this line
+        const formulaParts = line.split(/(\$[^$]+\$)/g);
         
         return (
           <Text key={lineIndex} style={style} selectable={true}>
-            {parts.map((part, partIndex) => {
-              if (part.startsWith('**') && part.endsWith('**')) {
-                // Bold text
+            {formulaParts.map((formulaPart, formulaIndex) => {
+              // Check if this is a formula
+              if (formulaPart.startsWith('$') && formulaPart.endsWith('$') && formulaPart.length > 2) {
+                const formula = formulaPart.slice(1, -1)
+                  // Greek letters
+                  .replace(/\\alpha/g, 'α')
+                  .replace(/\\beta/g, 'β')
+                  .replace(/\\gamma/g, 'γ')
+                  .replace(/\\delta/g, 'δ')
+                  .replace(/\\epsilon/g, 'ε')
+                  .replace(/\\sigma/g, 'σ')
+                  .replace(/\\mu/g, 'μ')
+                  .replace(/\\pi/g, 'π')
+                  .replace(/\\theta/g, 'θ')
+                  .replace(/\\lambda/g, 'λ')
+                  .replace(/\\omega/g, 'ω')
+                  .replace(/\\phi/g, 'φ')
+                  // Arrows
+                  .replace(/\\rightarrow/g, '→')
+                  .replace(/\\leftarrow/g, '←')
+                  .replace(/\\Rightarrow/g, '⇒')
+                  .replace(/\\leftrightarrow/g, '↔')
+                  // Math operators
+                  .replace(/\\times/g, '×')
+                  .replace(/\\div/g, '÷')
+                  .replace(/\\pm/g, '±')
+                  .replace(/\\approx/g, '≈')
+                  .replace(/\\neq/g, '≠')
+                  .replace(/\\leq/g, '≤')
+                  .replace(/\\geq/g, '≥')
+                  .replace(/\\infty/g, '∞')
+                  // Common functions
+                  .replace(/\\sqrt\{([^}]+)\}/g, '√($1)')
+                  .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1)/($2)')
+                  .replace(/\\sum/g, '∑')
+                  .replace(/\\int/g, '∫')
+                  .replace(/\\partial/g, '∂')
+                  // Chemical notation - charges
+                  .replace(/\^(\+)/g, '⁺')
+                  .replace(/\^(\-)/g, '⁻')
+                  // Superscripts for powers (single digits)
+                  .replace(/\^0/g, '⁰')
+                  .replace(/\^1/g, '¹')
+                  .replace(/\^2/g, '²')
+                  .replace(/\^3/g, '³')
+                  .replace(/\^4/g, '⁴')
+                  .replace(/\^5/g, '⁵')
+                  .replace(/\^6/g, '⁶')
+                  .replace(/\^7/g, '⁷')
+                  .replace(/\^8/g, '⁸')
+                  .replace(/\^9/g, '⁹')
+                  // Subscripts for chemical formulas (single digits)
+                  .replace(/_0/g, '₀')
+                  .replace(/_1/g, '₁')
+                  .replace(/_2/g, '₂')
+                  .replace(/_3/g, '₃')
+                  .replace(/_4/g, '₄')
+                  .replace(/_5/g, '₅')
+                  .replace(/_6/g, '₆')
+                  .replace(/_7/g, '₇')
+                  .replace(/_8/g, '₈')
+                  .replace(/_9/g, '₉');
+                  
                 return (
-                  <Text key={partIndex} style={{ fontWeight: '700' }}>
-                    {part.slice(2, -2)}
-                  </Text>
-                );
-              } else if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
-                // Italic text
-                return (
-                  <Text key={partIndex} style={{ fontStyle: 'italic' }}>
-                    {part.slice(1, -1)}
+                  <Text key={`${lineIndex}-formula-${formulaIndex}`} style={{ 
+                    fontFamily: 'Courier', 
+                    backgroundColor: Colors.primaryBlue + '10',
+                    paddingHorizontal: 4,
+                    borderRadius: 4,
+                    color: Colors.primaryBlue,
+                    fontWeight: '600'
+                  }}>
+                    {formula}
                   </Text>
                 );
               }
-              return part;
-            })}
+              
+              // Not a formula, handle bold/italic formatting
+              const parts = formulaPart.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+              
+              return parts.map((part, partIndex) => {
+                if (part.startsWith('**') && part.endsWith('**')) {
+                  // Bold text
+                  return (
+                    <Text key={`${lineIndex}-${formulaIndex}-${partIndex}`} style={{ fontWeight: '700' }}>
+                      {part.slice(2, -2)}
+                    </Text>
+                  );
+                } else if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
+                  // Italic text
+                  return (
+                    <Text key={`${lineIndex}-${formulaIndex}-${partIndex}`} style={{ fontStyle: 'italic' }}>
+                      {part.slice(1, -1)}
+                    </Text>
+                  );
+                }
+                return <Text key={`${lineIndex}-${formulaIndex}-${partIndex}`}>{part}</Text>;
+              });
+            }).flat()}
           </Text>
         );
       })}
@@ -155,6 +423,7 @@ const ContentItemComponent: React.FC<{ item: ContentItem; level?: number }> = ({
       case 'exemple':
         return (
           <View style={styles.exampleBlock}>
+            <Text style={styles.exampleLabel}>Exemple</Text>
             {item.titre && <Text style={styles.blockTitle} selectable={true}>{item.titre}</Text>}
             <FormattedText text={item.valeur || ''} style={styles.exampleContent} />
           </View>
@@ -178,19 +447,77 @@ const ContentItemComponent: React.FC<{ item: ContentItem; level?: number }> = ({
           .replace(/\\epsilon/g, 'ε')
           .replace(/\\sigma/g, 'σ')
           .replace(/\\mu/g, 'μ')
+          .replace(/\\omega/g, 'ω')
+          .replace(/\\phi/g, 'φ')
+          .replace(/\\psi/g, 'ψ')
+          .replace(/\\rho/g, 'ρ')
+          .replace(/\\tau/g, 'τ')
+          .replace(/\\eta/g, 'η')
+          .replace(/\\zeta/g, 'ζ')
+          .replace(/\\xi/g, 'ξ')
           .replace(/\\rightarrow/g, '→')
           .replace(/\\leftarrow/g, '←')
           .replace(/\\Rightarrow/g, '⇒')
           .replace(/\\Leftarrow/g, '⇐')
+          .replace(/\\leftrightarrow/g, '↔')
+          .replace(/\\Leftrightarrow/g, '⇔')
+          .replace(/\\uparrow/g, '↑')
+          .replace(/\\downarrow/g, '↓')
+          .replace(/\\updownarrow/g, '↕')
           .replace(/\\times/g, '×')
           .replace(/\\div/g, '÷')
           .replace(/\\pm/g, '±')
+          .replace(/\\mp/g, '∓')
           .replace(/\\approx/g, '≈')
           .replace(/\\neq/g, '≠')
           .replace(/\\leq/g, '≤')
           .replace(/\\geq/g, '≥')
+          .replace(/\\ll/g, '≪')
+          .replace(/\\gg/g, '≫')
           .replace(/\\infty/g, '∞')
-          .replace(/\\partial/g, '∂');
+          .replace(/\\partial/g, '∂')
+          .replace(/\\nabla/g, '∇')
+          .replace(/\\forall/g, '∀')
+          .replace(/\\exists/g, '∃')
+          .replace(/\\in/g, '∈')
+          .replace(/\\notin/g, '∉')
+          .replace(/\\subset/g, '⊂')
+          .replace(/\\supset/g, '⊃')
+          .replace(/\\subseteq/g, '⊆')
+          .replace(/\\supseteq/g, '⊇')
+          .replace(/\\cup/g, '∪')
+          .replace(/\\cap/g, '∩')
+          .replace(/\\emptyset/g, '∅')
+          .replace(/\\cdot/g, '·')
+          .replace(/\\ldots/g, '…')
+          .replace(/\\cdots/g, '⋯')
+          .replace(/\\vdots/g, '⋮')
+          .replace(/\\ddots/g, '⋱')
+          // Chemical notation - charges
+          .replace(/\^(\+)/g, '⁺')
+          .replace(/\^(\-)/g, '⁻')
+          // Superscripts for powers (single digits)
+          .replace(/\^0/g, '⁰')
+          .replace(/\^1/g, '¹')
+          .replace(/\^2/g, '²')
+          .replace(/\^3/g, '³')
+          .replace(/\^4/g, '⁴')
+          .replace(/\^5/g, '⁵')
+          .replace(/\^6/g, '⁶')
+          .replace(/\^7/g, '⁷')
+          .replace(/\^8/g, '⁸')
+          .replace(/\^9/g, '⁹')
+          // Subscripts for chemical formulas (single digits)
+          .replace(/_0/g, '₀')
+          .replace(/_1/g, '₁')
+          .replace(/_2/g, '₂')
+          .replace(/_3/g, '₃')
+          .replace(/_4/g, '₄')
+          .replace(/_5/g, '₅')
+          .replace(/_6/g, '₆')
+          .replace(/_7/g, '₇')
+          .replace(/_8/g, '₈')
+          .replace(/_9/g, '₉');
 
         return (
           <View style={styles.formulaBlock}>
@@ -202,22 +529,23 @@ const ContentItemComponent: React.FC<{ item: ContentItem; level?: number }> = ({
       case 'definition':
         return (
           <View style={styles.definitionBlock}>
-            {item.titre && <Text style={styles.definitionTitle} selectable={true}>{item.titre}</Text>}
-            <FormattedText text={item.valeur || ''} style={styles.definitionContent} />
+            <Text style={styles.definitionContent} selectable={true}>
+              <Text style={{ color: Colors.accentGreen, fontWeight: '600' }}>
+                {item.titre}
+              </Text>
+              <Text> : </Text>
+              <FormattedText text={item.valeur || ''} style={styles.definitionContent} />
+            </Text>
           </View>
         );
 
       case 'mindmap':
-        // For now, show the raw Mermaid code in a styled block
-        // In a production app, you'd use a Mermaid renderer
+        // Parse and display Mermaid mindmap as a visual structure
         const mermaidCode = (item.valeur || '').replace(/```mermaid\n?/, '').replace(/```$/, '').trim();
         return (
           <View style={styles.mindmapBlock}>
             {item.titre && <Text style={styles.blockTitle} selectable={true}>{item.titre}</Text>}
-            <View style={styles.mindmapContent}>
-              <Text style={styles.mindmapLabel}>Diagramme Mental:</Text>
-              <FormattedTextInline text={mermaidCode} style={styles.mindmapCode} />
-            </View>
+            <MindmapVisualizer mermaidCode={mermaidCode} />
           </View>
         );
 
@@ -600,15 +928,15 @@ const styles = StyleSheet.create({
   
   // Content Items
   contentItem: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   textBlock: {
-    marginBottom: 4,
+    marginBottom: 8,
   },
   textContent: {
     ...Typography.body,
     color: Colors.textPrimary,
-    lineHeight: 26,
+    lineHeight: 28,
   },
   blockTitle: {
     ...Typography.headline,
@@ -629,16 +957,26 @@ const styles = StyleSheet.create({
   // Example Block
   exampleBlock: {
     backgroundColor: Colors.primaryLavender + '10',
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.primaryLavender,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginVertical: 12,
+    borderWidth: 1,
+    borderColor: Colors.primaryLavender + '20',
+  },
+  exampleLabel: {
+    fontSize: 12,
+    color: Colors.primaryLavender,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 12,
   },
   exampleContent: {
     ...Typography.body,
     color: Colors.textPrimary,
-    lineHeight: 24,
+    lineHeight: 26,
+    flex: 1,
   },
   
   // Formula Block
@@ -657,25 +995,9 @@ const styles = StyleSheet.create({
     lineHeight: 28,
   },
   
-  // Definition Block
+  // Definition Block - Simple style without border
   definitionBlock: {
-    backgroundColor: Colors.accentGreen + '08',
-    borderWidth: 1,
-    borderColor: Colors.accentGreen + '30',
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.accentGreen,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderRadius: 12,
     marginVertical: 4,
-    shadowColor: Colors.accentGreen + '20',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 2,
   },
   definitionContent: {
     ...Typography.body,
@@ -710,26 +1032,85 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   
+  // Mindmap Visualizer Styles
+  mindmapContainer: {
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+  },
+  mindmapNode: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 6,
+    position: 'relative',
+  },
+  mindmapRootNode: {
+    marginVertical: 12,
+    justifyContent: 'center',
+  },
+  mindmapConnector: {
+    position: 'absolute',
+    left: -20,
+    top: '50%',
+    width: 20,
+    height: 2,
+    backgroundColor: Colors.warning + '40',
+    marginTop: -1,
+  },
+  mindmapNodeContent: {
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 2,
+    borderColor: Colors.warning + '30',
+    shadowColor: Colors.card.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  mindmapRootContent: {
+    backgroundColor: Colors.warning,
+    borderColor: Colors.warning,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  mindmapNodeText: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    fontWeight: '500',
+  },
+  mindmapRootText: {
+    color: Colors.surface,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  
   // Subsections
   subsection: {
-    marginTop: 12,
-    marginBottom: 12,
+    marginTop: 20,
+    marginBottom: 20,
     paddingLeft: 0,
   },
   nestedSubsection: {
     marginLeft: 20,
-    paddingLeft: 16,
-    borderLeftWidth: 2,
-    borderLeftColor: Colors.gray[300],
+    paddingLeft: 20,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.accentGreen + '30',
+    backgroundColor: Colors.surface,
+    borderRadius: 8,
+    paddingVertical: 16,
+    paddingRight: 16,
   },
   subsectionTitle: {
     ...Typography.headline,
     color: Colors.accentGreen,
-    marginBottom: 12,
-    fontWeight: '600',
+    marginBottom: 16,
+    fontWeight: '700',
+    fontSize: 20,
   },
   nestedSubsectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
   },
   
   // Conclusion

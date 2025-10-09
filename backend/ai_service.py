@@ -153,11 +153,37 @@ class AIService:
             logger.info(f"Total execution time: {total_time:.2f} seconds")
             logger.info(f"Results: course={type(results[0])}, flashcards={len(results[1])}, quiz={len(results[2])}")
 
+            # Generate key points from course sections
+            key_points = []
+            course = results[0]
+            
+            # Extract key points from course structure
+            if hasattr(course, 'plan') and course.plan:
+                key_points = course.plan[:5]  # Take first 5 items from plan as key points
+            elif hasattr(course, 'sections') and course.sections:
+                # Extract section titles as key points
+                for section in course.sections[:5]:  # Limit to 5 key points
+                    if hasattr(section, 'titre'):
+                        key_points.append(section.titre)
+                    elif hasattr(section, 'title'):
+                        key_points.append(section.title)
+            
+            # Generate summary from description or introduction
+            summary = ""
+            if hasattr(course, 'description'):
+                summary = course.description
+            elif hasattr(course, 'introduction') and hasattr(course.introduction, 'texte'):
+                summary = course.introduction.texte[:500]  # First 500 chars
+            elif hasattr(course, 'overview') and hasattr(course.overview, 'objective'):
+                summary = course.overview.objective
+            
             return ProcessedChapter(
                 transcription=text,
                 course=results[0],
                 flashcards=results[1],
-                quiz=results[2]
+                quiz=results[2],
+                key_points=key_points,
+                summary=summary
             )
 
         except Exception as e:
@@ -183,108 +209,143 @@ class AIService:
                     input=[
                         {
                             "role": "developer",
-                            "content": """Tu dois uniquement répondre au format JSON décrit ci-dessous, sans ajouter ni modifier la structure.
-Tu ne dois pas inventer de nouveaux champs ou formats.
+                            "content": """Tu es un expert pédagogique qui crée des cours structurés et intemporels. Tu dois produire un JSON avec la structure exacte suivante.
 
-Le JSON doit contenir : titre_cours, description, introduction, plan, sections, conclusion, et references.
+RÈGLES CRITIQUES DE FORMATAGE :
 
-Les champs sections et sous-sections contiennent une liste d'éléments dans le champ contenu.
+1. **GRAS SÉLECTIF** : Mets en **gras** UNIQUEMENT les termes vraiment importants (concepts nouveaux, définitions clés). Maximum 5-10% du texte.
+2. **PARAGRAPHES COURTS ET NOMBREUX** : 2-3 phrases par paragraphe, puis \\n\\n. Tu peux avoir plusieurs paragraphes consécutifs.
+3. **UTILISE DES LISTES POUR CLARIFIER** : Utilise des listes à puces ou numérotées quand cela aide à clarifier des idées ou organiser l'information.
+4. **STRUCTURE OBLIGATOIRE** : TOUT le contenu d'une section DOIT être dans des sous-sections.
 
-Chaque élément de contenu doit avoir un champ "type" parmi :
-"texte", "formule", "mindmap", "definition", "exemple", "sous-section".
+GUIDE D'UTILISATION DES TYPES DE CONTENU :
 
-Les formules mathématiques doivent être écrites en LaTeX entre $$ ... $$.
+1. **TEXTE** : Explications claires et bien structurées.
+   - Paragraphes de 2-3 phrases maximum, séparés par \\n\\n
+   - Plusieurs paragraphes consécutifs sont possibles et encouragés
+   - Utilise des listes quand cela clarifie l'information :
+     * Liste à puces : "\\n- Premier point\\n- Deuxième point"
+     * Liste numérotée : "\\n1. Première étape\\n2. Deuxième étape"
+   - Gras seulement pour les mots-clés essentiels
+   - Formules inline : $formule$ dans le texte
+   - Pour les flèches : utilise → ← ⇒ ⇐ ou $\\rightarrow$ $\\leftarrow$
+   - Chimie : $H_2O$ (eau), $CO_2$ (dioxyde de carbone), $Na^+$ (ion sodium)
+   - Puissances : $x^2$ (x au carré), $10^{-3}$ (10 puissance -3)
 
-Les schémas mentaux doivent être en Mermaid (dans un bloc triple backticks avec le mot mermaid).
+2. **DÉFINITION** : Pour les termes techniques importants.
+   - "titre" = le terme à définir
+   - "valeur" = définition claire et concise
 
-Le texte peut contenir du gras (**texte**), des italiques (*texte*), des listes à puces (-) ou numérotées (1.).
+3. **EXEMPLE** : OBLIGATOIRE après chaque concept important.
+   - Commence par "Exemple :" (sans gras)
+   - Cas concret bien structuré
+   - Utilise des listes quand cela aide à clarifier les étapes
 
-RETOURS À LA LIGNE : Utilise \n pour créer des retours à la ligne dans le texte. Exemple :
-"Première ligne\n\nDeuxième ligne après un saut\n- Liste à puces\n- Deuxième élément"
+4. **FORMULE** : Pour les expressions mathématiques.
+   - Format : $$formule$$ pour les formules en bloc
+   - Dans le texte : $formule$ pour les formules inline
 
-Tu peux imbriquer librement texte, exemples, formules et définitions dans une section.
+5. **MINDMAP** : Pour visualiser les relations entre concepts.
+   - Format Mermaid avec structure claire
+   - Hiérarchie logique
 
-Les références doivent être une liste d'objets contenant au minimum un titre et un lien ou un auteur.
+6. **SOUS-SECTION** : Structure obligatoire.
+   - Tout contenu doit être dans des sous-sections
+   - Chaque sous-section : plusieurs paragraphes d'explication + exemple(s)
 
+STRUCTURE OBLIGATOIRE D'UNE SECTION :
 {
-  "titre_cours": "Titre du cours",
-  "description": "Brève présentation du cours (quel est le thème, le public visé, les objectifs, etc.)",
-  "introduction": {
-    "texte": "Texte d'introduction libre pouvant contenir du **gras**, des listes à puces, ou des listes numérotées."
-  },
-  "plan": [
-    "Titre de la section 1",
-    "Titre de la section 2",
-    "Titre de la section 3"
-  ],
-  "sections": [
+  "titre": "Titre de la section principale",
+  "contenu": [
     {
-      "titre": "Titre de la section",
+      "type": "sous-section",
+      "titre": "Premier aspect du sujet",
       "contenu": [
         {
           "type": "texte",
-          "valeur": "Texte libre pouvant contenir du **gras**, des listes à puces, des listes numérotées, etc."
+          "valeur": "Le **concept principal** se définit par ses caractéristiques essentielles.\\n\\nIl existe trois aspects fondamentaux :\\n\\n1. Premier aspect avec explication\\n2. Deuxième aspect important\\n3. Troisième aspect complémentaire\\n\\nLa formule $f(x) = ax + b$ représente la forme générale."
         },
         {
-          "type": "sous-section",
-          "titre": "Titre de la sous-section",
-          "contenu": [
-            {
-              "type": "texte",
-              "valeur": "Texte descriptif ou explicatif."
-            },
-            {
-              "type": "formule",
-              "valeur": "$$E = mc^2$$"
-            },
-            {
-              "type": "exemple",
-              "valeur": "Exemple concret ou mise en situation illustrant le concept."
-            },
-            {
-              "type": "definition",
-              "titre": "Fonction mathématique",
-              "valeur": "Une fonction est une relation qui associe à chaque élément d'un ensemble de départ (domaine) une unique valeur d'un ensemble d'arrivée (codomaine).\n\n**Notation :** f: A → B\n**Propriété :** Pour tout x ∈ A, il existe un unique y ∈ B tel que f(x) = y"
-            },
-            {
-              "type": "mindmap",
-              "valeur": "```mermaid\nmindmap\n  root((Concept principal))\n    Sous-partie A\n    Sous-partie B\n```"
-            }
-          ]
-        },
-        {
-          "type": "formule",
-          "valeur": "$$\\int_a^b f(x)dx = F(b) - F(a)$$"
+          "type": "definition",
+          "titre": "Terme clé",
+          "valeur": "Définition claire et précise du terme."
         },
         {
           "type": "exemple",
-          "valeur": "Exemple illustrant la formule précédente."
+          "valeur": "Exemple : Considérons une fonction linéaire.\\n\\nÉtapes de résolution :\\n\\n1. Identifier les paramètres\\n2. Appliquer la formule\\n3. Vérifier le résultat\\n\\nLe résultat final est x = 5."
+        }
+      ]
+    },
+    {
+      "type": "sous-section",
+      "titre": "Deuxième aspect du sujet",
+      "contenu": [
+        {
+          "type": "texte",
+          "valeur": "Développement avec **beaucoup de gras** et des paragraphes bien séparés."
+        }
+      ]
+    }
+  ]
+}
+
+FORMATAGE OPTIMAL :
+- **Gras** : Seulement 5-10% du texte (termes nouveaux, concepts clés)
+- **Paragraphes** : 2-3 phrases maximum, puis \\n\\n. Tu peux enchaîner plusieurs paragraphes.
+- **Listes** : Utilise-les quand cela clarifie l'information
+- **Structure claire** : Introduction → Développement → Exemples
+
+EXEMPLE DE TEXTE BIEN STRUCTURÉ :
+"Le **concept principal** se comprend à travers son contexte historique. Il a été développé pour répondre à un besoin spécifique.\\n\\nSon application moderne diffère légèrement de sa forme originale. Les adaptations ont permis une meilleure intégration.\\n\\nCela nous conduit naturellement vers le concept suivant."
+
+EXEMPLE AVEC LISTE POUR CLARIFIER :
+"Les caractéristiques principales sont :\\n\\n- Première caractéristique\\n- Deuxième caractéristique\\n- Troisième caractéristique"
+
+EXEMPLE DE DESCRIPTION BIEN STRUCTURÉE :
+"description": "Ce cours explore les **fondamentaux** de [sujet].\\n\\nObjectifs d'apprentissage :\\n\\n1. Comprendre les principes de base\\n2. Maîtriser les techniques essentielles\\n3. Appliquer les connaissances en pratique\\n\\nÀ l'issue de ce cours, vous saurez utiliser ces concepts dans des situations réelles.\\n\\nAucun prérequis n'est nécessaire, seulement de la curiosité."
+
+STRUCTURE JSON COMPLÈTE :
+{
+  "titre_cours": "Titre clair et engageant",
+  "description": "[Description structurée avec listes et paragraphes courts]",
+  "introduction": {
+    "texte": "Bienvenue dans ce cours sur les **fondamentaux** de [sujet].\\n\\nCe cours est structuré en trois parties :\\n\\n1. Les bases théoriques essentielles\\n2. Les applications pratiques\\n3. Les cas d'usage avancés\\n\\nChaque section comprend des exemples concrets et des exercices.\\n\\nCommençons par explorer les concepts de base."
+  },
+  "plan": [
+    "Les fondamentaux essentiels",
+    "Applications pratiques et exemples",
+    "Concepts avancés et perspectives"
+  ],
+  "sections": [
+    {
+      "titre": "Section principale",
+      "contenu": [
+        {
+          "type": "sous-section",
+          "titre": "Titre explicite de la sous-section",
+          "contenu": [
+            {
+              "type": "texte",
+              "valeur": "Introduction au concept avec une explication claire.\\n\\nLes points essentiels sont :\\n\\n- Point numéro un\\n- Point numéro deux\\n- Point numéro trois"
+            },
+            {
+              "type": "exemple",
+              "valeur": "Exemple : Application concrète du concept.\\n\\nProcédure :\\n\\n1. Première étape\\n2. Deuxième étape\\n3. Résultat obtenu"
+            }
+          ]
         }
       ]
     }
   ],
   "conclusion": {
-    "texte": "Texte de conclusion récapitulant les idées principales et ouvrant sur d'autres perspectives."
+    "texte": "Pour conclure, nous avons exploré les **concepts essentiels** de ce chapitre.\\n\\nPoints clés à retenir :\\n\\n- Premier concept fondamental et son application\\n- Deuxième principe important à maîtriser\\n- Troisième élément clé pour la pratique\\n\\nCes notions vous serviront de base pour les chapitres suivants.\\n\\nN'hésitez pas à revoir les exemples pour bien assimiler ces concepts."
   },
-  "references": [
-    {
-      "type": "livre",
-      "titre": "Nom du livre",
-      "auteur": "Auteur",
-      "annee": 2021,
-      "editeur": "Maison d'édition"
-    },
-    {
-      "type": "article",
-      "titre": "Titre de l'article",
-      "lien": "https://exemple.com"
-    }
-  ]
+  "references": []
 }"""
                         },
                         {
                             "role": "user",
-                            "content": f"""Transforme ce contenu en cours structuré en respectant EXACTEMENT le format JSON spécifié:
+                            "content": f"""Crée un cours structuré à partir de ce contenu :
 
 Matière: {subject_name}
 Leçon: {lesson_name}
@@ -293,43 +354,26 @@ Chapitre: {chapter_name}
 Contenu brut:
 {text}
 
-INSTRUCTIONS CRITIQUES:
-1. FILTRAGE DU CONTENU:
-   - IGNORE complètement les salutations ("bonjour", "bonsoir", etc.)
-   - IGNORE les références temporelles ("aujourd'hui", "hier", "demain", "cette semaine", etc.)
-   - IGNORE les références personnelles ("je", "nous", "mon professeur", "changement de prof", etc.)
-   - IGNORE les références au planning ou à l'organisation du cours
-   - IGNORE les éléments de contexte scolaire (absences, changements d'horaire, etc.)
-   - FOCUS uniquement sur le CONTENU ACADÉMIQUE pur
-
-2. CONTENU À CONSERVER:
-   - Concepts théoriques et définitions
-   - Formules et équations
-   - Exemples concrets et applications
-   - Méthodes et procédures
-   - Données factuelles et scientifiques
-
-3. GÉNÉRATION:
-   - Génère un cours complet et détaillé
-   - Organise le contenu de manière logique et intemporelle
-   - Utilise tous les types de contenu appropriés (texte, formule, exemple, definition, mindmap, sous-section)
-   - Les formules mathématiques doivent être en LaTeX entre $$...$$
-   - Les mindmaps doivent être en format Mermaid
-   - Écris dans un style académique neutre et intemporel
-
-4. FORMAT SPÉCIFIQUE DES DÉFINITIONS:
-   - Toujours inclure un "titre" clair pour la définition
-   - Structure la "valeur" avec : définition principale + détails/propriétés
-   - Utilise des retours à la ligne (\n) pour séparer les parties
-   - Utilise le gras (**texte**) pour les mots-clés importants
-   - Exemple de structure :
-     "titre": "Nom du concept"
-     "valeur": "Définition principale.\n\n**Propriétés :**\n- Propriété 1\n- Propriété 2\n\n**Notation :** symboles mathématiques"
-
-5. RETOURS À LA LIGNE:
-   - Utilise \n pour les retours à la ligne simples
-   - Utilise \n\n pour créer des paragraphes séparés
-   - Dans les listes, chaque élément sur une nouvelle ligne avec \n"""
+CONSIGNES CRITIQUES :
+1. Filtre tout élément personnel ou temporel (salutations, dates, références au prof)
+2. Conserve uniquement le contenu académique pur
+3. STRUCTURE OBLIGATOIRE : Toutes les sections contiennent UNIQUEMENT des sous-sections
+4. FORMATAGE OPTIMAL :
+   - Paragraphes de 2-3 phrases maximum, séparés par \\n\\n
+   - Tu peux avoir plusieurs paragraphes consécutifs pour développer une idée
+   - Utilise des listes quand cela clarifie l'information
+   - Gras uniquement pour les termes importants (5-10% du texte)
+5. Chaque sous-section contient :
+   - Plusieurs paragraphes d'explication si nécessaire
+   - Au moins un exemple concret
+   - Structure adaptée au contenu
+6. Pour les formules et symboles :
+   - Formules inline : $formule$ dans le texte
+   - Flèches directes : → ← ⇒ ⇐ ↔
+   - Ou LaTeX : $\\rightarrow$ $\\leftarrow$ etc.
+   - Notations chimiques : $H_2O$, $CO_2$, $Na^+$, $Cl^-$
+   - Puissances : $x^2$, $10^3$, $E = mc^2$
+7. Privilégie la clarté et l'aération naturelle du texte"""
                         }
                     ],
                     text={
