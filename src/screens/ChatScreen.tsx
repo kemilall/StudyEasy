@@ -134,7 +134,6 @@ export const ChatScreen: React.FC = () => {
             placeholder="Poser une question..."
             placeholderTextColor={Colors.text.tertiary}
             multiline
-            maxHeight={100}
           />
           <TouchableOpacity
             style={[

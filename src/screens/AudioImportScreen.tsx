@@ -16,7 +16,7 @@ import { Typography } from '../constants/typography';
 
 export const AudioImportScreen: React.FC = () => {
   const navigation = useNavigation();
-  const [selectedFile, setSelectedFile] = useState<any>(null);
+  const [selectedFile, setSelectedFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
   const handlePickAudio = async () => {
@@ -25,9 +25,9 @@ export const AudioImportScreen: React.FC = () => {
         type: 'audio/*',
         copyToCacheDirectory: true,
       });
-      
-      if (result.type === 'success') {
-        setSelectedFile(result);
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setSelectedFile(result.assets[0]);
       }
     } catch (error) {
       Alert.alert('Erreur', 'Impossible de sélectionner le fichier audio.');
@@ -45,8 +45,8 @@ export const AudioImportScreen: React.FC = () => {
     }, 2000);
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
+  const formatFileSize = (bytes?: number | null) => {
+    if (!bytes) return 'Taille inconnue';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));

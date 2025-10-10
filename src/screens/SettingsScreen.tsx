@@ -7,30 +7,72 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
+  Linking,
+  Alert,
 } from 'react-native';
+import { StackScreenProps } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
+import { ProfileStackParamList } from '../navigation/types';
 
-export const SettingsScreen: React.FC = () => {
+type SettingsScreenProps = StackScreenProps<ProfileStackParamList, 'Settings'>;
+
+type ToggleSettingItem = {
+  type: 'toggle';
+  icon: string;
+  label: string;
+  value: boolean;
+  onToggle: (value: boolean) => void;
+};
+
+type NavigationSettingItem = {
+  type: 'link';
+  icon: string;
+  label: string;
+  value?: string;
+  onPress: () => void;
+};
+
+type SettingItem = ToggleSettingItem | NavigationSettingItem;
+
+type SettingsSection = {
+  title: string;
+  items: SettingItem[];
+};
+
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
-  const [darkModeEnabled, setDarkModeEnabled] = React.useState(false);
+  const [language, setLanguage] = React.useState<'Français' | 'Anglais'>('Français');
 
-  const settingsSections = [
+  const handleLanguageChange = () => {
+    setLanguage((prev) => (prev === 'Français' ? 'Anglais' : 'Français'));
+  };
+
+  const openHelpCenter = async () => {
+    const url = 'https://support.studyeasy.app';
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      await Linking.openURL(url);
+    } else {
+      Alert.alert("Centre d'aide", "Impossible d'ouvrir le centre d'aide pour le moment.");
+    }
+  };
+
+  const contactSupport = () => {
+    Linking.openURL('mailto:support@studyeasy.app');
+  };
+
+  const settingsSections: SettingsSection[] = [
     {
-      title: 'Compte',
+      title: 'Notifications',
       items: [
         {
-          icon: 'person-outline',
-          label: 'Profil',
-          value: 'Étudiant',
-          onPress: () => {},
-        },
-        {
-          icon: 'mail-outline',
-          label: 'Email',
-          value: 'etudiant@example.com',
-          onPress: () => {},
+          type: 'toggle',
+          icon: 'notifications-outline',
+          label: 'Notifications push',
+          value: notificationsEnabled,
+          onToggle: setNotificationsEnabled,
         },
       ],
     },
@@ -38,44 +80,52 @@ export const SettingsScreen: React.FC = () => {
       title: 'Préférences',
       items: [
         {
-          icon: 'notifications-outline',
-          label: 'Notifications',
-          isToggle: true,
-          value: notificationsEnabled,
-          onToggle: setNotificationsEnabled,
-        },
-        {
-          icon: 'moon-outline',
-          label: 'Mode sombre',
-          isToggle: true,
-          value: darkModeEnabled,
-          onToggle: setDarkModeEnabled,
-        },
-        {
+          type: 'link',
           icon: 'language-outline',
-          label: 'Langue',
-          value: 'Français',
-          onPress: () => {},
+          label: "Langue de l'interface",
+          value: language,
+          onPress: handleLanguageChange,
+        },
+        {
+          type: 'link',
+          icon: 'card-outline',
+          label: 'Gérer mon abonnement',
+          onPress: () => navigation.navigate('Subscription'),
         },
       ],
     },
     {
-      title: 'Support',
+      title: 'Support & légal',
       items: [
         {
+          type: 'link',
           icon: 'help-circle-outline',
-          label: 'Aide',
-          onPress: () => {},
+          label: "Centre d'aide",
+          onPress: openHelpCenter,
         },
         {
+          type: 'link',
           icon: 'chatbubble-outline',
-          label: 'Contact',
-          onPress: () => {},
+          label: 'Contacter le support',
+          onPress: contactSupport,
         },
         {
+          type: 'link',
           icon: 'document-text-outline',
-          label: 'Conditions d\'utilisation',
-          onPress: () => {},
+          label: 'Mentions légales',
+          onPress: () => navigation.navigate('LegalNotice'),
+        },
+        {
+          type: 'link',
+          icon: 'shield-checkmark-outline',
+          label: 'Politique de confidentialité',
+          onPress: () => navigation.navigate('PrivacyPolicy'),
+        },
+        {
+          type: 'link',
+          icon: 'document-lock-outline',
+          label: "Conditions d'utilisation",
+          onPress: () => navigation.navigate('TermsOfUse'),
         },
       ],
     },
@@ -85,12 +135,12 @@ export const SettingsScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Paramètres</Text>
+        <Text style={styles.subtitle}>
+          Ajustez vos préférences de notifications, de langue et accédez à vos documents légaux.
+        </Text>
       </View>
 
-      <ScrollView 
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {settingsSections.map((section, sectionIndex) => (
           <View key={sectionIndex} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -102,25 +152,25 @@ export const SettingsScreen: React.FC = () => {
                     styles.settingItem,
                     itemIndex === section.items.length - 1 && styles.lastItem,
                   ]}
-                  onPress={item.onPress}
-                  disabled={item.isToggle}
-                  activeOpacity={item.isToggle ? 1 : 0.7}
+                  onPress={item.type === 'toggle' ? undefined : item.onPress}
+                  disabled={item.type === 'toggle'}
+                  activeOpacity={item.type === 'toggle' ? 1 : 0.7}
                 >
                   <View style={styles.settingLeft}>
-                    <Ionicons 
-                      name={item.icon as any} 
-                      size={24} 
-                      color={Colors.text.secondary} 
+                    <Ionicons
+                      name={item.icon as any}
+                      size={24}
+                      color={Colors.text.secondary}
                     />
                     <Text style={styles.settingLabel}>{item.label}</Text>
                   </View>
-                  {item.isToggle ? (
+                  {item.type === 'toggle' ? (
                     <Switch
                       value={item.value}
                       onValueChange={item.onToggle}
-                      trackColor={{ 
-                        false: Colors.gray[300], 
-                        true: Colors.accent.blue 
+                      trackColor={{
+                        false: Colors.gray[300],
+                        true: Colors.accent.blue,
                       }}
                       thumbColor={Colors.surface}
                     />
@@ -129,10 +179,10 @@ export const SettingsScreen: React.FC = () => {
                       {item.value && (
                         <Text style={styles.settingValue}>{item.value}</Text>
                       )}
-                      <Ionicons 
-                        name="chevron-forward" 
-                        size={20} 
-                        color={Colors.text.tertiary} 
+                      <Ionicons
+                        name="chevron-forward"
+                        size={20}
+                        color={Colors.text.tertiary}
                       />
                     </View>
                   )}
@@ -141,10 +191,6 @@ export const SettingsScreen: React.FC = () => {
             </View>
           </View>
         ))}
-
-        <TouchableOpacity style={styles.logoutButton} activeOpacity={0.8}>
-          <Text style={styles.logoutText}>Se déconnecter</Text>
-        </TouchableOpacity>
 
         <View style={styles.footer}>
           <Text style={styles.version}>Version 1.0.0</Text>
@@ -163,11 +209,16 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 24,
     paddingTop: 20,
-    paddingBottom: 16,
+    paddingBottom: 12,
+    gap: 8,
   },
   title: {
     ...Typography.largeTitle,
     color: Colors.text.primary,
+  },
+  subtitle: {
+    ...Typography.body,
+    color: Colors.text.secondary,
   },
   content: {
     flex: 1,
@@ -219,19 +270,6 @@ const styles = StyleSheet.create({
   settingValue: {
     ...Typography.subheadline,
     color: Colors.text.secondary,
-  },
-  logoutButton: {
-    backgroundColor: Colors.accent.red + '15',
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 32,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-  },
-  logoutText: {
-    ...Typography.headline,
-    color: Colors.accent.red,
   },
   footer: {
     alignItems: 'center',

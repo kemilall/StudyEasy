@@ -8,9 +8,11 @@ import {
   Animated,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
+import { RootStackParamList } from '../navigation/types';
 
 const PROCESSING_STEPS = [
   {
@@ -57,8 +59,10 @@ const PROCESSING_STEPS = [
   },
 ];
 
+type ProcessingScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ProcessingScreen'>;
+
 export const ProcessingScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<ProcessingScreenNavigationProp>();
   const [currentStep, setCurrentStep] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [progressAnim] = useState(new Animated.Value(0));
@@ -86,7 +90,7 @@ export const ProcessingScreen: React.FC = () => {
   }, []);
 
   const handleComplete = () => {
-    navigation.navigate('Chapter' as never, { chapterId: '1' } as never);
+    navigation.navigate('Chapter', { chapterId: '1' });
   };
 
   const handleCancel = () => {
@@ -167,30 +171,30 @@ export const ProcessingScreen: React.FC = () => {
         <View style={styles.stepsList}>
           {PROCESSING_STEPS.map((step, index) => {
             const isActive = index === currentStep;
-            const isCompleted = index < currentStep || isCompleted;
-            
+            const stepCompleted = index < currentStep || isCompleted;
+
             return (
               <View key={step.id} style={styles.stepItem}>
                 <View style={[
                   styles.stepIcon,
                   isActive && styles.stepIconActive,
-                  isCompleted && styles.stepIconCompleted,
+                  stepCompleted && styles.stepIconCompleted,
                 ]}>
-                  <Ionicons 
-                    name={isCompleted ? "checkmark" : step.icon as any}
-                    size={16} 
+                  <Ionicons
+                    name={stepCompleted ? 'checkmark' : (step.icon as any)}
+                    size={16}
                     color={
-                      isCompleted ? Colors.accent.green :
-                      isActive ? Colors.accent.blue : 
+                      stepCompleted ? Colors.accent.green :
+                      isActive ? Colors.accent.blue :
                       Colors.text.tertiary
-                    } 
+                    }
                   />
                 </View>
                 <View style={styles.stepContent}>
                   <Text style={[
                     styles.stepTitle,
                     isActive && styles.stepTitleActive,
-                    isCompleted && styles.stepTitleCompleted,
+                    stepCompleted && styles.stepTitleCompleted,
                   ]}>
                     {step.title}
                   </Text>
