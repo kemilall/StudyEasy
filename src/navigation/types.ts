@@ -15,11 +15,25 @@ export type RootStackParamList = {
 export type MainTabParamList = {
   Home: undefined;
   Subjects: undefined;
-  Settings: undefined;
+  Profile: undefined;
 };
 
 export type SubjectsStackParamList = {
   SubjectsList: undefined;
   Subject: { subjectId: string };
   Lesson: { lessonId: string };
+};
+
+export type ProfileStackParamList = {
+  ProfileHome: undefined;
+  Settings: undefined;
+  LegalNotice: undefined;
+  PrivacyPolicy: undefined;
+  Subscription: undefined;
+};
+
+export type AuthStackParamList = {
+  Login: undefined;
+  SignUp: undefined;
+  EmailAuth: { mode: 'login' | 'signup' };
 };

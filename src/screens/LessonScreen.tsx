@@ -8,18 +8,26 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import {
+  useNavigation,
+  useRoute,
+  RouteProp,
+  CompositeNavigationProp,
+} from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { ChapterCard } from '../components/ChapterCard';
 import { mockLessons, mockChapters } from '../data/mockData';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
-import { RootStackParamList } from '../navigation/types';
+import { RootStackParamList, SubjectsStackParamList } from '../navigation/types';
 import * as DocumentPicker from 'expo-document-picker';
 
-type LessonScreenRouteProp = RouteProp<RootStackParamList, 'Lesson'>;
-type LessonScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Lesson'>;
+type LessonScreenRouteProp = RouteProp<SubjectsStackParamList, 'Lesson'>;
+type LessonScreenNavigationProp = CompositeNavigationProp<
+  StackNavigationProp<SubjectsStackParamList, 'Lesson'>,
+  StackNavigationProp<RootStackParamList>
+>;
 
 export const LessonScreen: React.FC = () => {
   const navigation = useNavigation<LessonScreenNavigationProp>();

@@ -14,10 +14,10 @@ import { LessonCard } from '../components/LessonCard';
 import { mockSubjects, mockLessons } from '../data/mockData';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
-import { RootStackParamList } from '../navigation/types';
+import { SubjectsStackParamList } from '../navigation/types';
 
-type SubjectScreenRouteProp = RouteProp<RootStackParamList, 'Subject'>;
-type SubjectScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Subject'>;
+type SubjectScreenRouteProp = RouteProp<SubjectsStackParamList, 'Subject'>;
+type SubjectScreenNavigationProp = StackNavigationProp<SubjectsStackParamList, 'Subject'>;
 
 export const SubjectScreen: React.FC = () => {
   const navigation = useNavigation<SubjectScreenNavigationProp>();

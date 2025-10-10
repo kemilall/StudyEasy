@@ -7,55 +7,107 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
+  Alert,
+  Linking,
 } from 'react-native';
+import { StackScreenProps } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
+import { ProfileStackParamList } from '../navigation/types';
+import { useAuth } from '../context/AuthContext';
 
-export const SettingsScreen: React.FC = () => {
+type SettingsScreenProps = StackScreenProps<ProfileStackParamList, 'Settings'>;
+
+type SettingsItem = {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value?: string | boolean;
+  isToggle?: boolean;
+  onToggle?: (value: boolean) => void;
+  onPress?: () => void;
+};
+
+type SettingsSection = {
+  title: string;
+  items: SettingsItem[];
+};
+
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
+  const { user, logout } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
-  const [darkModeEnabled, setDarkModeEnabled] = React.useState(false);
+  const [studyRemindersEnabled, setStudyRemindersEnabled] = React.useState(false);
+  const [language, setLanguage] = React.useState<'Français' | 'Anglais' | 'Espagnol'>('Français');
 
-  const settingsSections = [
+  const handleLanguagePress = () => {
+    Alert.alert("Langue de l'application", 'Choisis la langue de StudyEasy', [
+      { text: 'Français', onPress: () => setLanguage('Français') },
+      { text: 'Anglais', onPress: () => setLanguage('Anglais') },
+      { text: 'Espagnol', onPress: () => setLanguage('Espagnol') },
+      { text: 'Annuler', style: 'cancel' },
+    ]);
+  };
+
+  const handlePasswordReset = () => {
+    Alert.alert(
+      'Sécurité',
+      "Nous allons t'envoyer un email pour réinitialiser ton mot de passe.",
+      [
+        {
+          text: 'Envoyer',
+          onPress: () =>
+            Linking.openURL(
+              'mailto:support@studyeasy.app?subject=Réinitialisation%20mot%20de%20passe'
+            ),
+        },
+        { text: 'Annuler', style: 'cancel' },
+      ]
+    );
+  };
+
+  const handleContact = () => Linking.openURL('mailto:contact@studyeasy.app');
+  const handleHelp = () => Linking.openURL('https://studyeasy.app/aide');
+  const handleDataRequest = () =>
+    Linking.openURL("mailto:privacy@studyeasy.app?subject=Demande%20d'accès%20aux%20données");
+
+  const settingsSections: SettingsSection[] = [
     {
       title: 'Compte',
       items: [
         {
-          icon: 'person-outline',
-          label: 'Profil',
-          value: 'Étudiant',
-          onPress: () => {},
+          icon: 'mail-outline',
+          label: 'Adresse email',
+          value: user?.email ?? 'Non renseignée',
         },
         {
-          icon: 'mail-outline',
-          label: 'Email',
-          value: 'etudiant@example.com',
-          onPress: () => {},
+          icon: 'key-outline',
+          label: 'Mettre à jour mon mot de passe',
+          onPress: handlePasswordReset,
         },
       ],
     },
     {
-      title: 'Préférences',
+      title: 'Notifications',
       items: [
         {
           icon: 'notifications-outline',
-          label: 'Notifications',
+          label: 'Notifications push',
           isToggle: true,
           value: notificationsEnabled,
           onToggle: setNotificationsEnabled,
         },
         {
-          icon: 'moon-outline',
-          label: 'Mode sombre',
+          icon: 'alarm-outline',
+          label: "Rappels d'étude quotidiens",
           isToggle: true,
-          value: darkModeEnabled,
-          onToggle: setDarkModeEnabled,
+          value: studyRemindersEnabled,
+          onToggle: setStudyRemindersEnabled,
         },
         {
           icon: 'language-outline',
-          label: 'Langue',
-          value: 'Français',
-          onPress: () => {},
+          label: "Langue de l'application",
+          value: language,
+          onPress: handleLanguagePress,
         },
       ],
     },
@@ -64,18 +116,38 @@ export const SettingsScreen: React.FC = () => {
       items: [
         {
           icon: 'help-circle-outline',
-          label: 'Aide',
-          onPress: () => {},
+          label: "Centre d'aide",
+          onPress: handleHelp,
         },
         {
           icon: 'chatbubble-outline',
-          label: 'Contact',
-          onPress: () => {},
+          label: 'Contacter le support',
+          onPress: handleContact,
+        },
+        {
+          icon: 'shield-checkmark-outline',
+          label: 'Gestion des données',
+          onPress: handleDataRequest,
         },
         {
           icon: 'document-text-outline',
-          label: 'Conditions d\'utilisation',
-          onPress: () => {},
+          label: 'Mentions légales',
+          onPress: () => navigation.navigate('LegalNotice'),
+        },
+        {
+          icon: 'newspaper-outline',
+          label: 'Politique de confidentialité',
+          onPress: () => navigation.navigate('PrivacyPolicy'),
+        },
+      ],
+    },
+    {
+      title: 'Abonnement',
+      items: [
+        {
+          icon: 'card-outline',
+          label: 'Gérer mon abonnement',
+          onPress: () => navigation.navigate('Subscription'),
         },
       ],
     },
@@ -85,19 +157,17 @@ export const SettingsScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Paramètres</Text>
+        <Text style={styles.subtitle}>Personnalise StudyEasy selon tes besoins</Text>
       </View>
 
-      <ScrollView 
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {settingsSections.map((section, sectionIndex) => (
-          <View key={sectionIndex} style={styles.section}>
+          <View key={section.title} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
             <View style={styles.sectionContent}>
               {section.items.map((item, itemIndex) => (
                 <TouchableOpacity
-                  key={itemIndex}
+                  key={`${section.title}-${item.label}`}
                   style={[
                     styles.settingItem,
                     itemIndex === section.items.length - 1 && styles.lastItem,
@@ -107,33 +177,35 @@ export const SettingsScreen: React.FC = () => {
                   activeOpacity={item.isToggle ? 1 : 0.7}
                 >
                   <View style={styles.settingLeft}>
-                    <Ionicons 
-                      name={item.icon as any} 
-                      size={24} 
-                      color={Colors.text.secondary} 
+                    <Ionicons
+                      name={item.icon}
+                      size={24}
+                      color={Colors.text.secondary}
                     />
                     <Text style={styles.settingLabel}>{item.label}</Text>
                   </View>
                   {item.isToggle ? (
                     <Switch
-                      value={item.value}
-                      onValueChange={item.onToggle}
-                      trackColor={{ 
-                        false: Colors.gray[300], 
-                        true: Colors.accent.blue 
+                      value={Boolean(item.value)}
+                      onValueChange={value => item.onToggle?.(value)}
+                      trackColor={{
+                        false: Colors.gray[300],
+                        true: Colors.accent.blue,
                       }}
                       thumbColor={Colors.surface}
                     />
                   ) : (
                     <View style={styles.settingRight}>
-                      {item.value && (
+                      {typeof item.value === 'string' && (
                         <Text style={styles.settingValue}>{item.value}</Text>
                       )}
-                      <Ionicons 
-                        name="chevron-forward" 
-                        size={20} 
-                        color={Colors.text.tertiary} 
-                      />
+                      {item.onPress && (
+                        <Ionicons
+                          name="chevron-forward"
+                          size={20}
+                          color={Colors.text.tertiary}
+                        />
+                      )}
                     </View>
                   )}
                 </TouchableOpacity>
@@ -142,7 +214,7 @@ export const SettingsScreen: React.FC = () => {
           </View>
         ))}
 
-        <TouchableOpacity style={styles.logoutButton} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.logoutButton} activeOpacity={0.8} onPress={logout}>
           <Text style={styles.logoutText}>Se déconnecter</Text>
         </TouchableOpacity>
 
@@ -164,10 +236,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 20,
     paddingBottom: 16,
+    gap: 4,
   },
   title: {
     ...Typography.largeTitle,
     color: Colors.text.primary,
+  },
+  subtitle: {
+    ...Typography.subheadline,
+    color: Colors.text.secondary,
   },
   content: {
     flex: 1,
