@@ -15,9 +15,9 @@ interface ProcessedLessonResponse {
     summary: string;
   };
   flashcards: Array<{
-    term: string;
-    definition: string;
-    example?: string;
+    type: string;
+    recto: string;
+    verso: string;
   }>;
   quiz: Array<{
     question: string;
@@ -233,8 +233,8 @@ export class AIService {
       // Transform the response to match our frontend format
       const flashcards: Flashcard[] = data.flashcards.map((fc, index) => ({
         id: `${index + 1}`,
-        question: fc.term,
-        answer: fc.definition + (fc.example ? `\n\nExemple: ${fc.example}` : ''),
+        question: fc.recto,
+        answer: fc.verso,
       }));
       
       const quiz: QuizQuestion[] = data.quiz.map((q, index) => ({
@@ -253,7 +253,7 @@ export class AIService {
           keyPoints: data.key_points,
           flashcards,
           quiz,
-          content: JSON.stringify(data.course), // Store structured course as JSON
+          ...(data.course && { content: JSON.stringify(data.course) }), // Store structured course as JSON only if it exists
         });
       }
 
@@ -305,7 +305,7 @@ export class AIService {
   // Generate flashcards from text
   static async generateFlashcards(
     text: string,
-    maxCards: number = 10
+    maxCards?: number
   ): Promise<Array<{ id: string; question: string; answer: string }>> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/generate-flashcards`, {
@@ -315,7 +315,7 @@ export class AIService {
         },
         body: JSON.stringify({
           text,
-          max_cards: maxCards,
+          ...(maxCards && { max_cards: maxCards }),
         }),
       });
 
@@ -326,11 +326,11 @@ export class AIService {
       const data = await response.json();
       const flashcards = data.flashcards || [];
 
-      // Transform to frontend format
+      // Transform to frontend format (new structure: type, recto, verso)
       return flashcards.map((fc: any, index: number) => ({
         id: `${index + 1}`,
-        question: fc.term,
-        answer: fc.definition + (fc.example ? `\n\nExemple: ${fc.example}` : ''),
+        question: fc.recto,
+        answer: fc.verso,
       }));
     } catch (error) {
       console.error('Flashcard generation error:', error);

@@ -156,9 +156,9 @@ export interface ProcessedChapterResponse {
   transcription: string;
   course: StructuredCourse | LegacyStructuredCourse | SimpleCourse; // Support new, legacy and simple formats
   flashcards: Array<{
-    term: string;
-    definition: string;
-    example?: string;
+    type: string;
+    recto: string;
+    verso: string;
   }>;
   quiz: Array<{
     question: string;

@@ -74,7 +74,7 @@ export const QuickActionsSection: React.FC<QuickActionsSectionProps> = ({
             alignItems: 'center',
             gap: 12,
           }}
-          onPress={() => navigation.navigate('RecordingSubjectPicker' as never)}
+          onPress={onRecordPress}
           accessibilityLabel="Enregistrer un cours"
         >
           <View
@@ -150,7 +150,7 @@ export const QuickActionsSection: React.FC<QuickActionsSectionProps> = ({
           alignItems: 'center',
           gap: 12,
         }}
-        onPress={() => navigation.navigate('CreateLesson' as never)}
+        onPress={onImportCoursePress}
         accessibilityLabel="Importer un cours"
       >
         <View

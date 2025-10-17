@@ -12,7 +12,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
+import { Colors } from '../constants/colors';
+import { Typography } from '../constants/typography';
+import { DesignTokens } from '../constants/designTokens';
+import { BackgroundWaves } from '../components/BackgroundWaves';
 
 interface SignUpScreenProps {
   navigation: any;
@@ -58,8 +63,9 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <BackgroundWaves opacity={0.05} color={Colors.primaryLavender} />
       <LinearGradient
-        colors={['#667eea', '#764ba2']}
+        colors={[Colors.surface, Colors.surfaceAlt]}
         style={styles.gradient}
       >
         <KeyboardAvoidingView
@@ -68,14 +74,17 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
         >
           <ScrollView contentContainerStyle={styles.scrollView}>
             <View style={styles.content}>
-              <Text style={styles.title}>StudyEasy</Text>
-              <Text style={styles.subtitle}>Créez votre compte</Text>
+              <View style={styles.header}>
+                <Ionicons name="school" size={48} color={Colors.accent.blue} />
+                <Text style={styles.title}>StudyEasy</Text>
+                <Text style={styles.subtitle}>Créez votre compte</Text>
+              </View>
 
               <View style={styles.formContainer}>
                 <TextInput
                   style={styles.input}
                   placeholder="Nom complet"
-                  placeholderTextColor="#8e8e93"
+                  placeholderTextColor={Colors.text.secondary}
                   value={displayName}
                   onChangeText={setDisplayName}
                   autoCapitalize="words"
@@ -83,8 +92,8 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
 
                 <TextInput
                   style={styles.input}
-                  placeholder="Email"
-                  placeholderTextColor="#8e8e93"
+                  placeholder="Adresse email"
+                  placeholderTextColor={Colors.text.secondary}
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
@@ -95,7 +104,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
                 <TextInput
                   style={styles.input}
                   placeholder="Mot de passe"
-                  placeholderTextColor="#8e8e93"
+                  placeholderTextColor={Colors.text.secondary}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
@@ -105,7 +114,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
                 <TextInput
                   style={styles.input}
                   placeholder="Confirmer le mot de passe"
-                  placeholderTextColor="#8e8e93"
+                  placeholderTextColor={Colors.text.secondary}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry
@@ -121,13 +130,13 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
                     {isLoading ? 'Création...' : 'Créer le compte'}
                   </Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity onPress={navigateToLogin} style={styles.loginLink}>
-                  <Text style={styles.loginText}>
-                    Déjà un compte ? <Text style={styles.loginTextBold}>Se connecter</Text>
-                  </Text>
-                </TouchableOpacity>
               </View>
+
+              <TouchableOpacity onPress={navigateToLogin} style={styles.loginLink}>
+                <Text style={styles.loginText}>
+                  Déjà un compte ? <Text style={styles.loginTextBold}>Se connecter</Text>
+                </Text>
+              </TouchableOpacity>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -153,60 +162,70 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 24,
+    maxWidth: 400,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 32,
   },
   title: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: 'white',
-    textAlign: 'center',
+    ...Typography.h1,
+    color: Colors.text.primary,
+    marginTop: 16,
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
+    ...Typography.body,
+    color: Colors.text.secondary,
     textAlign: 'center',
-    marginBottom: 48,
   },
   formContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    borderRadius: DesignTokens.radii.xl,
     padding: 24,
-    marginHorizontal: 8,
+    marginBottom: 24,
+    ...DesignTokens.shadows.md,
   },
   input: {
-    backgroundColor: '#f1f3f4',
-    borderRadius: 12,
+    backgroundColor: Colors.surfaceAlt,
+    borderRadius: DesignTokens.radii.md,
     padding: 16,
     fontSize: 16,
     marginBottom: 16,
-    color: '#333',
+    color: Colors.text.primary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Typography.body,
   },
   signUpButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
+    backgroundColor: Colors.accent.blue,
+    borderRadius: DesignTokens.radii.md,
     padding: 16,
     alignItems: 'center',
     marginTop: 8,
+    minHeight: 56,
   },
   disabledButton: {
     opacity: 0.6,
   },
   signUpButtonText: {
-    color: 'white',
-    fontSize: 16,
+    ...Typography.headline,
+    color: Colors.textOnPrimary,
     fontWeight: '600',
   },
   loginLink: {
-    marginTop: 24,
     alignItems: 'center',
   },
   loginText: {
-    color: '#666',
-    fontSize: 14,
+    ...Typography.body,
+    color: Colors.text.secondary,
   },
   loginTextBold: {
-    color: '#007AFF',
+    ...Typography.body,
+    color: Colors.accent.blue,
     fontWeight: '600',
   },
 });

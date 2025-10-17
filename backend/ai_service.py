@@ -140,7 +140,7 @@ class AIService:
 
             tasks = [
                 self.generate_structured_course(text, chapter_name, lesson_name, subject_name),
-                self.generate_flashcards(text),
+                self.generate_flashcards(text),  # No limit - let AI generate optimal count
                 self.generate_quiz(text)
             ]
 
@@ -205,7 +205,7 @@ class AIService:
 
             def _generate():
                 response = self.client.responses.create(
-                    model="gpt-5",
+                    model="gpt-5-mini",
                     input=[
                         {
                             "role": "developer",
@@ -403,58 +403,387 @@ CONSIGNES CRITIQUES :
             logger.error(f"Course generation error: {str(e)}")
             raise
     
-    async def generate_flashcards(self, text: str, max_cards: int = 20) -> List[Flashcard]:
-        """Generate flashcards from text using GPT-4.1"""
+    async def generate_flashcards(self, text: str, max_cards: Optional[int] = None) -> List[Flashcard]:
+        """Generate flashcards from text using GPT-5-mini with comprehensive French pedagogical prompt"""
         try:
             if self.client is None:
                 raise ValueError("OPENAI_API_KEY not set; flashcard generation requires OpenAI.")
-            logger.info(f"[PARALLEL] Starting flashcards generation (max {max_cards} cards)")
+            max_cards_str = f"up to {max_cards}" if max_cards else "unlimited"
+            logger.info(f"[PARALLEL] Starting flashcards generation ({max_cards_str} cards)")
 
             def _generate():
                 response = self.client.responses.create(
-                    model="gpt-4.1",
+                    model="gpt-5-mini",
                     input=[
                         {
                             "role": "developer",
-                            "content": """You are an expert at creating educational flashcards designed to output JSON.
-Extract ALL key terms, concepts, and definitions from the text.
-Create comprehensive flashcards that cover the entire content.
-Each flashcard should help students memorize important information.
+                            "content": [
+                                {
+                                    "type": "input_text",
+                                    "text": """Tu es un générateur de flashcards pédagogiques. À partir du contenu de cours fourni, tu dois extraire et créer des flashcards COURTES, CIBLÉES et NOMBREUSES qui permettent d'apprendre sans avoir le cours sous les yeux.
 
-Return a JSON array of flashcards with this exact structure:
+## PRINCIPE FONDAMENTAL : ATOMICITÉ, CONCISION ET INDÉPENDANCE TOTALE
+
+Chaque flashcard doit être :
+- **COURTE** : 1 concept = 1 flashcard (ne pas regrouper plusieurs idées)
+- **CIBLÉE** : Une seule information testable par carte
+- **TOTALEMENT INDÉPENDANTE** : Compréhensible par quelqu'un qui n'a JAMAIS vu le cours
+- **AUTONOME** : Aucune référence au cours ("comme vu", "cette méthode", "ce type")
+- **AUTO-SUFFISANTE** : Tous les termes et contextes nécessaires sont inclus dans la flashcard
+- **CONCISE** : Réponse en 1-3 phrases MAXIMUM
+
+**DIVISER plutôt que regrouper** : Si un sujet a plusieurs aspects, crée plusieurs flashcards distinctes.
+
+## Types de flashcards à créer (clé "type")
+
+Chaque flashcard doit avoir un type qui indique la nature de la réponse attendue :
+
+- **definition** : Définir un terme, concept ou acronyme
+- **fait** : Donner une donnée factuelle, chiffre, date
+- **formule** : Énoncer une équation ou un calcul
+- **comparaison** : Différencier deux éléments
+- **procedure** : Décrire une étape ou une méthode
+- **exemple** : Illustrer par un cas concret
+- **classification** : Catégoriser ou lister un type
+- **cause** : Expliquer une origine ou raison
+- **consequence** : Décrire un effet ou résultat
+- **indication** : Préciser quand utiliser/appliquer
+
+## Règles d'extraction INTENSIVES
+
+Crée UNE flashcard pour CHAQUE :
+- **Terme technique** → 1 flashcard (type: definition)
+- **Fait chiffré** → 1 flashcard (type: fait)
+- **Caractéristique clinique** → 1 flashcard (type: classification ou fait)
+- **Étape de processus** → 1 flashcard (type: procedure)
+- **Critère d'une liste** → 1 flashcard (type: classification)
+- **Différence entre 2 concepts** → 1 flashcard (type: comparaison)
+- **Cause/conséquence** → 1 flashcard (type: cause ou consequence)
+- **Indication/contre-indication** → 1 flashcard (type: indication)
+- **Complication** → 1 flashcard (type: consequence)
+
+**STRATÉGIE DE DIVISION :**
+- Liste de 3 signes cliniques → 3 flashcards (1 par signe)
+- Processus en 4 étapes → 4 flashcards (1 par étape)
+- Formule avec 3 variables → 2-3 flashcards (formule + variables si complexes)
+- Comparaison A vs B → 1-2 flashcards selon complexité
+
+## RÈGLES CRITIQUES D'INDÉPENDANCE
+
+❌ **JAMAIS de références implicites** :
+- ❌ "Cette technique permet..."
+- ❌ "Comme mentionné précédemment..."
+- ❌ "Dans ce cas..."
+- ❌ "Cette pathologie..."
+- ❌ "Ce traitement..."
+
+✅ **TOUJOURS expliciter** :
+- ✅ "La technique X permet..."
+- ✅ "Le syndrome de Poland..."
+- ✅ "En cas de brûlure circulaire..."
+- ✅ "La formule de Parkland..."
+- ✅ "L'escharotomie..."
+
+**Chaque flashcard doit fonctionner SEULE, mélangée avec des flashcards d'autres cours.**
+
+## Critères de qualité
+
+✓ INCLURE et DIVISER :
+- Chaque information testable séparément
+- Chaque élément d'une énumération
+- Chaque caractéristique distinctive
+- Chaque étape d'un protocole
+- Le contexte minimal pour comprendre SANS le cours
+
+✗ EXCLURE :
+- Informations redondantes
+- Détails non essentiels
+- Références au document source
+
+## Format de sortie OBLIGATOIRE
+```json
 [
   {
-    "term": "string",
-    "definition": "string",
-    "example": "string (optional)"
+    "type": "definition",
+    "recto": "Question ou terme précis",
+    "verso": "Réponse courte et claire (1-3 phrases max)."
+  },
+  {
+    "type": "fait",
+    "recto": "Autre question ciblée",
+    "verso": "Autre réponse concise."
   }
-]"""
+]
+```
+
+## Exemples de flashcards COURTES, CIBLÉES et INDÉPENDANTES
+
+**MAUVAIS (références implicites, trop long) :**
+```json
+{
+  "type": "definition",
+  "recto": "Quelles sont les phases et leurs caractéristiques ?",
+  "verso": "Phase G1: croissance. Phase S: réplication. Phase G2: préparation. Phase M: division."
+}
+```
+
+**BON (divisé, explicite, indépendant) :**
+```json
+[
+  {
+    "type": "definition",
+    "recto": "Phase G1 du cycle cellulaire : fonction principale",
+    "verso": "Phase de croissance cellulaire avec synthèse protéique active avant la réplication de l'ADN."
+  },
+  {
+    "type": "fait",
+    "recto": "Phase S du cycle cellulaire : événement majeur",
+    "verso": "Réplication complète de l'ADN (duplication du génome entier)."
+  },
+  {
+    "type": "definition",
+    "recto": "Phase G2 du cycle cellulaire : rôle",
+    "verso": "Phase de préparation à la mitose avec vérification de la réplication et réparation d'erreurs."
+  },
+  {
+    "type": "procedure",
+    "recto": "Phase M du cycle cellulaire : déroulement",
+    "verso": "Division cellulaire en deux étapes : mitose (séparation des chromosomes) puis cytokinèse (séparation du cytoplasme)."
+  }
+]
+```
+
+**Autres exemples avec types variés :**
+```json
+[
+  {
+    "type": "formule",
+    "recto": "Théorème de Pythagore : équation",
+    "verso": "a² + b² = c² où c est l'hypoténuse du triangle rectangle."
+  },
+  {
+    "type": "fait",
+    "recto": "Capitale du Japon",
+    "verso": "Tokyo (environ 14 millions d'habitants dans la préfecture)."
+  },
+  {
+    "type": "formule",
+    "recto": "Photosynthèse : équation chimique simplifiée",
+    "verso": "6CO₂ + 6H₂O + lumière → C₆H₁₂O₆ + 6O₂"
+  },
+  {
+    "type": "fait",
+    "recto": "Révolution française : année de début",
+    "verso": "1789, déclenchée par la prise de la Bastille le 14 juillet."
+  },
+  {
+    "type": "definition",
+    "recto": "HTTP : signification",
+    "verso": "HyperText Transfer Protocol (protocole de communication web entre client et serveur)."
+  },
+  {
+    "type": "comparaison",
+    "recto": "Différence entre RAM et ROM",
+    "verso": "RAM = mémoire volatile effacée à l'extinction. ROM = mémoire permanente en lecture seule."
+  },
+  {
+    "type": "fait",
+    "recto": "Vitesse de la lumière dans le vide",
+    "verso": "Environ 300 000 km/s (valeur exacte : 299 792 458 m/s)."
+  },
+  {
+    "type": "definition",
+    "recto": "Première loi de Newton (principe d'inertie)",
+    "verso": "Un corps reste au repos ou en mouvement rectiligne uniforme tant qu'aucune force extérieure n'agit sur lui."
+  },
+  {
+    "type": "definition",
+    "recto": "ADN : signification de l'acronyme",
+    "verso": "Acide DésoxyriboNucléique, molécule support de l'information génétique."
+  },
+  {
+    "type": "exemple",
+    "recto": "Python : déclarer une liste vide (2 méthodes)",
+    "verso": "ma_liste = [] ou ma_liste = list()"
+  },
+  {
+    "type": "consequence",
+    "recto": "Conséquence d'une carence en vitamine C",
+    "verso": "Scorbut : maladie provoquant fatigue, saignements gingivaux et cicatrisation difficile."
+  },
+  {
+    "type": "cause",
+    "recto": "Cause principale de la rouille du fer",
+    "verso": "Oxydation du fer au contact de l'oxygène et de l'humidité (eau)."
+  }
+]
+```
+
+## FORMAT ULTRA COMPLET POUR LES FORMULES MATHÉMATIQUES ET PHYSIQUES (LATEX)
+
+### Système de Balises LaTeX OBLIGATOIRES
+
+Tu DOIS générer les formules avec ces balises LaTeX exactes (comme ChatGPT) :
+
+**1. FORMULE EN LIGNE** (dans le texte, petites formules):
+- TOUJOURS utiliser: \\( formule \\)
+- Exemple: \\(E_c\\) pour l'énergie cinétique dans une phrase
+- Quand: variable ou petite formule dans le texte explicatif
+
+**2. FORMULE CENTRÉE** (affichée, mise en avant):
+- TOUJOURS utiliser: \\[ formule \\]
+- Exemple: \\[E_c = \\frac{1}{2}mv^2\\]
+- Quand: formule principale, résultat important
+
+### Pour les flashcards de type "formule":
+
+**Structure OBLIGATOIRE** :
+1. Formule principale entre \\[ et \\] (centrée, bien visible)
+2. Double saut de ligne \\n\\n
+3. Texte "Où:" suivi des définitions des variables
+4. Chaque variable inline entre \\( et \\)
+5. Unités SI systématiques entre parenthèses
+
+**SYNTAXE LATEX À UTILISER** :
+- Fractions: \\frac{numerateur}{denominateur}
+- Indices: underscore (E_c, m_1, H_2O)
+- Exposants: chapeau (x^2, 10^{-11})
+- Lettres grecques: \\alpha \\beta \\gamma \\Delta \\omega \\rho \\Omega
+- Racine: \\sqrt{x}
+- Opérateurs: \\times \\div \\approx \\leq \\geq
+- Maximum 4 variables par flashcard
+- Si formule complexe → diviser en plusieurs flashcards
+
+**Exemples PARFAITS avec LaTeX** :
+
+**RAPPEL CRITIQUE**: Dans le JSON, DOUBLER tous les backslash !
+- Écrire \\\\[ au lieu de \\[
+- Écrire \\\\( au lieu de \\(
+- Écrire \\\\n au lieu de \\n
+- Sinon le JSON ne se parsera pas !
+
+```json
+[
+  {
+    "type": "formule",
+    "recto": "Énergie cinétique : formule",
+    "verso": "\\\\[E_c = \\\\frac{1}{2}mv^2\\\\]\\\\n\\\\nOù \\\\(m\\\\) = masse (kg), \\\\(v\\\\) = vitesse (m/s), \\\\(E_c\\\\) = énergie cinétique (J)."
+  },
+  {
+    "type": "formule",
+    "recto": "Loi d'Ohm : relation tension-courant",
+    "verso": "\\\\[U = RI\\\\]\\\\n\\\\nOù \\\\(U\\\\) = tension (V), \\\\(R\\\\) = résistance (\\\\(\\\\Omega\\\\)), \\\\(I\\\\) = intensité (A)."
+  },
+  {
+    "type": "formule",
+    "recto": "Force de gravitation universelle",
+    "verso": "\\\\[F = G\\\\frac{m_1 m_2}{r^2}\\\\]\\\\n\\\\nOù \\\\(F\\\\) = force (N), \\\\(G = 6.674 \\\\times 10^{-11}\\\\) N·m²/kg², \\\\(m_1, m_2\\\\) = masses (kg), \\\\(r\\\\) = distance (m)."
+  },
+  {
+    "type": "formule",
+    "recto": "Pression hydrostatique",
+    "verso": "\\\\[P = \\\\rho g h\\\\]\\\\n\\\\nOù \\\\(P\\\\) = pression (Pa), \\\\(\\\\rho\\\\) = masse volumique (kg/m³), \\\\(g = 9.81\\\\) m/s², \\\\(h\\\\) = profondeur (m)."
+  },
+  {
+    "type": "formule",
+    "recto": "Équation des gaz parfaits",
+    "verso": "\\\\[PV = nRT\\\\]\\\\n\\\\nOù \\\\(P\\\\) = pression (Pa), \\\\(V\\\\) = volume (m³), \\\\(n\\\\) = quantité de matière (mol), \\\\(R = 8.314\\\\) J/(mol·K), \\\\(T\\\\) = température (K)."
+  },
+  {
+    "type": "formule",
+    "recto": "Énergie potentielle de pesanteur",
+    "verso": "\\\\[E_p = mgh\\\\]\\\\n\\\\nOù \\\\(E_p\\\\) = énergie potentielle (J), \\\\(m\\\\) = masse (kg), \\\\(g = 9.81\\\\) m/s², \\\\(h\\\\) = hauteur (m)."
+  }
+]
+```
+
+**Pour les réactions chimiques** :
+- LaTeX chimie: \\\\ce{H2O} ou \\\\ce{2H2 + O2 -> 2H2O}
+- Ou notation simple avec indices Unicode: H₂O, CO₂, Na⁺, Cl⁻
+- Priorité: indices/exposants Unicode simples si court
+
+**RÈGLES ABSOLUES - VÉRIFIE SYSTÉMATIQUEMENT** :
+- Formule principale: TOUJOURS entre \\\\[ et \\\\] (doubler les backslash dans JSON!)
+- Variables dans texte: TOUJOURS entre \\\\( et \\\\) (doubler les backslash dans JSON!)
+- TOUS les symboles mathématiques en LaTeX (avec backslash doublés)
+- JAMAIS mélanger LaTeX et Unicode dans une même formule
+- Regarde bien les exemples JSON ci-dessus pour le format exact avec \\\\
+
+## Règles pour le JSON
+
+**ATTENTION ÉCHAPPEMENT JSON OBLIGATOIRE** :
+- Dans le JSON, TOUS les backslash doivent être DOUBLÉS
+- Écrire \\\\[ et NON \\[ (sinon erreur de parsing)
+- Écrire \\\\( et NON \\( (sinon erreur de parsing)
+- Écrire \\\\n pour les retours à la ligne
+
+**Structure du JSON** :
+- Clé "type": UN SEUL MOT parmi (definition, fait, formule, comparaison, procedure, exemple, classification, cause, consequence, indication)
+- Clé "recto": Question ou terme PRÉCIS, COURT et AUTONOME
+- Clé "verso": Réponse en 1-3 phrases MAXIMUM avec TOUS les éléments de contexte
+- Pour les formules: TOUJOURS doubler les backslashes (voir exemples ci-dessus)
+- JSON valide et parsable
+- Réponds UNIQUEMENT avec l'array JSON
+
+## Instructions critiques pour MAXIMISER le nombre de flashcards
+
+- Parcours le contenu de manière EXHAUSTIVE dans l'ordre
+- **DIVISE systématiquement** : 2-3 infos distinctes → 2-3 flashcards
+- Ne saute AUCUNE information testable
+- **Préfère 3 flashcards courtes à 1 flashcard longue**
+- Vise la GRANULARITÉ MAXIMALE : chaque concept atomique = 1 carte
+- **VÉRIFIE l'indépendance** : quelqu'un qui n'a jamais vu le cours doit comprendre
+- **EXPLICITE tout** : noms complets, contextes, définitions intégrées
+- Si tu hésites entre regrouper ou diviser → DIVISE
+- Si une flashcard fait référence à "ce/cette/ces" → REFORMULE avec le terme exact
+
+Applique cette méthodologie de manière SYSTÉMATIQUE et DÉTERMINISTE.
+
+Réponds UNIQUEMENT avec l'array JSON, sans texte avant ou après."""
+                                }
+                            ]
                         },
                         {
                             "role": "user",
-                            "content": f"""Create flashcards from this text. Include ALL important terms and concepts:
+                            "content": f"""Crée des flashcards à partir de ce contenu de cours :
 
 {text}
 
-Generate at least {max_cards} flashcards covering all key concepts."""
+Génère au moins {max_cards} flashcards en suivant EXACTEMENT les règles ci-dessus."""
                         }
                     ],
-                    text={"format": {"type": "json_object"}}
+                    text={
+                        "format": {
+                            "type": "text"
+                        },
+                        "verbosity": "high"
+                    },
+                    reasoning={
+                        "effort": "low"
+                    },
+                    tools=[],
+                    store=True,
+                    include=[
+                        "reasoning.encrypted_content",
+                        "web_search_call.action.sources"
+                    ]
                 )
 
                 import json
-                flashcards_data = json.loads(response.output_text)
-                if isinstance(flashcards_data, dict):
-                    # If it's a dict, try to find the flashcards in it
-                    if 'flashcards' in flashcards_data:
-                        flashcards_data = flashcards_data['flashcards']
-                    else:
-                        # Convert dict to list if it's a single flashcard
-                        flashcards_data = [flashcards_data]
+                # Parse the response - expecting a JSON array directly
+                output = response.output_text.strip()
+                flashcards_data = json.loads(output)
+                
                 if not isinstance(flashcards_data, list):
-                    raise ValueError(f"Expected list or dict with flashcards, got {type(flashcards_data)}")
+                    raise ValueError(f"Expected list of flashcards, got {type(flashcards_data)}")
+                
                 result = [Flashcard(**card) for card in flashcards_data]
-                return result[:max_cards] if len(result) > max_cards else result
+                # Return all flashcards generated (the new prompt is designed to create optimal count)
+                # Only limit if max_cards is explicitly specified (not None)
+                if max_cards is not None and len(result) > max_cards:
+                    logger.warning(f"Generated {len(result)} flashcards, limiting to {max_cards}")
+                    return result[:max_cards]
+                return result
 
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(self.executor, _generate)
@@ -467,7 +796,7 @@ Generate at least {max_cards} flashcards covering all key concepts."""
             raise
     
     async def generate_quiz(self, text: str, num_questions: int = 10) -> List[QuizQuestion]:
-        """Generate quiz questions from text using GPT-4.1"""
+        """Generate quiz questions from text using GPT-5-mini with new API format"""
         try:
             if self.client is None:
                 raise ValueError("OPENAI_API_KEY not set; quiz generation requires OpenAI.")
@@ -475,11 +804,14 @@ Generate at least {max_cards} flashcards covering all key concepts."""
 
             def _generate():
                 response = self.client.responses.create(
-                    model="gpt-4.1",
+                    model="gpt-5-mini",
                     input=[
                         {
                             "role": "developer",
-                            "content": """You are an expert quiz creator designed to output JSON.
+                            "content": [
+                                {
+                                    "type": "input_text",
+                                    "text": """You are an expert quiz creator designed to output JSON.
 Create challenging but fair multiple-choice questions that test understanding of the material.
 Each question should have exactly 3 options with one correct answer.
 Provide clear explanations for the correct answer.
@@ -492,7 +824,11 @@ Return a JSON array of quiz questions with this exact structure:
     "correct_answer": 0,
     "explanation": "string"
   }
-]"""
+]
+
+IMPORTANT: Return ONLY the JSON array, without any additional text or markdown formatting."""
+                                }
+                            ]
                         },
                         {
                             "role": "user",
@@ -503,11 +839,24 @@ Return a JSON array of quiz questions with this exact structure:
 Ensure questions cover different aspects of the content and test real understanding."""
                         }
                     ],
-                    text={"format": {"type": "json_object"}}
+                    text={
+                        "format": {
+                            "type": "text"
+                        },
+                        "verbosity": "high"
+                    },
+                    reasoning={
+                        "effort": "low"
+                    },
+                    tools=[],
+                    store=True
                 )
 
                 import json
-                questions_data = json.loads(response.output_text)
+                # Parse the response - expecting a JSON array directly
+                output = response.output_text.strip()
+                questions_data = json.loads(output)
+                
                 if isinstance(questions_data, dict):
                     # If it's a dict, try to find the questions in it
                     if 'questions' in questions_data:
@@ -574,7 +923,7 @@ If asked about something not in the course, politely redirect to the course mate
                 })
 
                 response = self.client.responses.create(
-                    model="gpt-4.1",
+                    model="gpt-5-mini",
                     input=input_messages
                 )
 

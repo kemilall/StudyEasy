@@ -27,12 +27,16 @@ export type RootStackParamList = {
     fileName?: string;
     mimeType?: string;
   } | undefined;
+  ImportCourse: { subjectId?: string };
+  Profile: undefined;
+  Legal: undefined;
+  Subscription: undefined;
 };
 
 export type MainTabParamList = {
   Home: undefined;
   Subjects: undefined;
-  Settings: undefined;
+  Profile: undefined;
 };
 
 export type SubjectsStackParamList = {

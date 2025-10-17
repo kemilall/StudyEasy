@@ -14,7 +14,7 @@ class CourseGenerationRequest(BaseModel):
 
 class FlashcardsRequest(BaseModel):
     text: str
-    max_cards: Optional[int] = 20
+    max_cards: Optional[int] = None
 
 class QuizRequest(BaseModel):
     text: str
@@ -28,9 +28,9 @@ class ChatRequest(BaseModel):
 
 # Response Models
 class Flashcard(BaseModel):
-    term: str = Field(description="The key term or concept")
-    definition: str = Field(description="The definition or explanation of the term")
-    example: Optional[str] = Field(None, description="An example to illustrate the concept")
+    type: str = Field(description="Type of flashcard: definition, fait, formule, comparaison, procedure, exemple, classification, cause, consequence, indication")
+    recto: str = Field(description="Question or term (front of the flashcard)")
+    verso: str = Field(description="Answer or explanation (back of the flashcard)")
 
 class QuizQuestion(BaseModel):
     question: str = Field(description="The quiz question")

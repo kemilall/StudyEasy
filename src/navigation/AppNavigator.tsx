@@ -17,11 +17,15 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { AudioImportScreen } from '../screens/AudioImportScreen';
 import { CreateSubjectScreen } from '../screens/CreateSubjectScreen';
 import { CreateLessonScreen } from '../screens/CreateLessonScreen';
+import { ImportCourseScreen } from '../screens/ImportCourseScreen';
 import { ProcessingScreen } from '../screens/ProcessingScreen';
 import { RecordingSubjectPickerScreen } from '../screens/RecordingSubjectPickerScreen';
 import { RecordingStudioScreen } from '../screens/RecordingStudioScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { SignUpScreen } from '../screens/SignUpScreen';
+import { ProfileScreen } from '../screens/ProfileScreen';
+import { LegalScreen } from '../screens/LegalScreen';
+import { SubscriptionScreen } from '../screens/SubscriptionScreen';
 import { useAuth } from '../contexts/AuthContext';
 import { RecordingProvider } from '../contexts/RecordingContext';
 import { FloatingRecordingBubble } from '../components/FloatingRecordingBubble';
@@ -88,24 +92,24 @@ const MainTabs = () => {
         options={{
           tabBarLabel: 'Matières',
           tabBarIcon: ({ focused, color }) => (
-            <Ionicons 
-              name={focused ? 'book' : 'book-outline'} 
-              size={24} 
-              color={color} 
+            <Ionicons
+              name={focused ? 'book' : 'book-outline'}
+              size={24}
+              color={color}
             />
           ),
         }}
       />
       <Tab.Screen
-        name="Settings"
-        component={SettingsScreen}
+        name="Profile"
+        component={ProfileScreen}
         options={{
-          tabBarLabel: 'Paramètres',
+          tabBarLabel: 'Profil',
           tabBarIcon: ({ focused, color }) => (
-            <Ionicons 
-              name={focused ? 'settings' : 'settings-outline'} 
-              size={24} 
-              color={color} 
+            <Ionicons
+              name={focused ? 'person' : 'person-outline'}
+              size={24}
+              color={color}
             />
           ),
         }}
@@ -166,13 +170,29 @@ const AppStack = () => {
           name="CreateSubject" 
           component={CreateSubjectScreen}
         />
-        <Stack.Screen 
-          name="CreateLesson" 
+        <Stack.Screen
+          name="CreateLesson"
           component={CreateLessonScreen}
+        />
+        <Stack.Screen
+          name="ImportCourse"
+          component={ImportCourseScreen}
         />
         <Stack.Screen
           name="ProcessingScreen"
           component={ProcessingScreen}
+        />
+        <Stack.Screen
+          name="Profile"
+          component={ProfileScreen}
+        />
+        <Stack.Screen
+          name="Legal"
+          component={LegalScreen}
+        />
+        <Stack.Screen
+          name="Subscription"
+          component={SubscriptionScreen}
         />
       </Stack.Navigator>
       <FloatingRecordingBubble />

@@ -24,46 +24,43 @@ interface RouteParams {
   localUri?: string;
   fileName?: string;
   mimeType?: string;
+  subjectName?: string;
+  lessonName?: string;
+  content?: string;
+  source?: string;
 }
 
 const PROCESSING_STEPS = [
   {
     id: 1,
-    title: 'Analyse de l\'audio',
-    subtitle: 'Extraction et optimisation du signal audio',
-    icon: 'pulse',
-    duration: 3000,
+    title: 'Analyse du contenu',
+    subtitle: 'Extraction et préparation du texte',
+    icon: 'document-text',
+    duration: 2000,
   },
   {
     id: 2,
-    title: 'Transcription',
-    subtitle: 'Conversion de la parole en texte',
-    icon: 'document-text',
+    title: 'Génération du cours',
+    subtitle: 'Création de la structure pédagogique',
+    icon: 'school',
     duration: 4000,
   },
   {
     id: 3,
-    title: 'Génération du résumé',
-    subtitle: 'Analyse et synthèse du contenu',
-    icon: 'bulb',
-    duration: 3000,
-  },
-  {
-    id: 4,
     title: 'Création des flashcards',
     subtitle: 'Identification des concepts clés',
     icon: 'albums',
     duration: 2500,
   },
   {
-    id: 5,
+    id: 4,
     title: 'Génération du quiz',
     subtitle: 'Création de questions personnalisées',
     icon: 'help-circle',
     duration: 2000,
   },
   {
-    id: 6,
+    id: 5,
     title: 'Finalisation',
     subtitle: 'Organisation et sauvegarde du contenu',
     icon: 'checkmark-circle',
@@ -75,7 +72,7 @@ export const ProcessingScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { user } = useAuth();
-  const { lessonId, subjectId, audioUrl, documentText, localUri, fileName, mimeType } = route.params as RouteParams;
+  const { lessonId, subjectId, audioUrl, documentText, localUri, fileName, mimeType, subjectName, lessonName, content, source } = route.params as RouteParams;
   
   const [currentStep, setCurrentStep] = useState(0);
   const [stepName, setStepName] = useState('Initialisation');
@@ -112,43 +109,46 @@ export const ProcessingScreen: React.FC = () => {
         }
         const subjects = await DataService.getUserSubjects(user.uid);
         const subject = subjects.find(s => s.id === (subjectId || lesson.subjectId));
-        
+
         if (!subject) {
           throw new Error('Impossible de charger les informations de la matière');
         }
 
-        // Define steps dynamically based on whether we have audio to transcribe
-        const stepsCount = (localUri || audioUrl) && !documentText ? 6 : 5;
+        // Define steps for text processing (5 steps instead of 6)
+        const stepsCount = 5;
         setTotalSteps(stepsCount);
 
         // Step 1: Initialisation
         updateProgress(1, stepsCount, 'Initialisation', 'Préparation du traitement');
 
-        // Step 2: Transcription si audio fourni sans texte
-        let transcriptionText = documentText || '';
-        if ((localUri || audioUrl) && !documentText) {
-          updateProgress(2, stepsCount, 'Transcription', 'Conversion de l\'audio en texte');
-          transcriptionText = await AIService.transcribeAudio(localUri || (audioUrl as string), fileName, mimeType);
+        // Step 2: Content analysis (no transcription needed for imported text)
+        updateProgress(2, stepsCount, 'Analyse du contenu', 'Préparation du texte pour traitement');
+
+        // Use the provided content or documentText
+        const contentToProcess = content || documentText || '';
+        if (!contentToProcess.trim()) {
+          throw new Error('Aucun contenu à traiter');
         }
 
-        // Step 3-5: Traitement parallèle (cours, flashcards, quiz)
-        updateProgress((localUri || audioUrl) && !documentText ? 3 : 2, stepsCount, 'Génération du contenu', 'Traitement parallèle en cours...');
+        // Step 3: Generate structured course
+        updateProgress(3, stepsCount, 'Génération du cours', 'Création de la structure pédagogique');
 
-        // Utiliser processLesson() qui fait tout en parallèle dans le backend
+        // Process the lesson using AI service
         const processedContent = await AIService.processLesson(
           lessonId,
-          localUri || (audioUrl as string),
-          transcriptionText,
+          null, // No audio URL for imported content
+          contentToProcess,
           {
             lesson: lesson,
             subject: subject
-          },
-          fileName,
-          mimeType
+          }
         );
 
-        // Step 6: Finalisation
-        updateProgress(stepsCount, stepsCount, 'Finalisation', 'Sauvegarde du contenu');
+        // Step 4: Generate flashcards and quiz in parallel
+        updateProgress(4, stepsCount, 'Création des éléments', 'Flashcards et quiz en cours');
+
+        // Step 5: Finalisation
+        updateProgress(5, stepsCount, 'Finalisation', 'Sauvegarde du contenu');
 
         // Persist results in Firebase
         await DataService.updateLesson(lessonId, {
@@ -162,7 +162,7 @@ export const ProcessingScreen: React.FC = () => {
         });
 
         setIsCompleted(true);
-        
+
       } catch (error) {
         console.error('Processing error:', error);
         // @ts-ignore - runtime error type
@@ -180,7 +180,7 @@ export const ProcessingScreen: React.FC = () => {
     };
 
     processContent();
-  }, [audioUrl, documentText, lessonId, user]);
+  }, [content, documentText, lessonId, user, subjectId]);
 
   const handleComplete = () => {
     (navigation as any).navigate('Lesson', { lessonId });

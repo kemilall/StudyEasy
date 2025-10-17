@@ -14,10 +14,12 @@ import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { useAuth } from '../contexts/AuthContext';
 
-export const SettingsScreen: React.FC = () => {
-  const { userProfile, signOut } = useAuth();
-  const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
-  const [darkModeEnabled, setDarkModeEnabled] = React.useState(false);
+interface SettingsScreenProps {
+  navigation: any;
+}
+
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
+  const { signOut } = useAuth();
 
   const handleSignOut = () => {
     Alert.alert(
@@ -25,8 +27,8 @@ export const SettingsScreen: React.FC = () => {
       'Êtes-vous sûr de vouloir vous déconnecter ?',
       [
         { text: 'Annuler', style: 'cancel' },
-        { 
-          text: 'Déconnexion', 
+        {
+          text: 'Déconnexion',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -40,66 +42,32 @@ export const SettingsScreen: React.FC = () => {
     );
   };
 
+  const handleSupport = () => {
+    Alert.alert('Support', 'Vous pouvez nous contacter à support@studyeasy.app');
+  };
+
+  const handleLegal = () => {
+    navigation.navigate('Legal');
+  };
+
   const settingsSections = [
-    {
-      title: 'Compte',
-      items: [
-        {
-          icon: 'person-outline',
-          label: 'Profil',
-          value: userProfile?.displayName || 'Utilisateur',
-          onPress: () => {},
-        },
-        {
-          icon: 'mail-outline',
-          label: 'Email',
-          value: userProfile?.email || 'Non disponible',
-          onPress: () => {},
-        },
-      ],
-    },
-    {
-      title: 'Préférences',
-      items: [
-        {
-          icon: 'notifications-outline',
-          label: 'Notifications',
-          isToggle: true,
-          value: notificationsEnabled,
-          onToggle: setNotificationsEnabled,
-        },
-        {
-          icon: 'moon-outline',
-          label: 'Mode sombre',
-          isToggle: true,
-          value: darkModeEnabled,
-          onToggle: setDarkModeEnabled,
-        },
-        {
-          icon: 'language-outline',
-          label: 'Langue',
-          value: 'Français',
-          onPress: () => {},
-        },
-      ],
-    },
     {
       title: 'Support',
       items: [
         {
           icon: 'help-circle-outline',
-          label: 'Aide',
-          onPress: () => {},
+          label: 'Centre d\'aide',
+          onPress: handleSupport,
         },
         {
           icon: 'chatbubble-outline',
-          label: 'Contact',
-          onPress: () => {},
+          label: 'Nous contacter',
+          onPress: handleSupport,
         },
         {
           icon: 'document-text-outline',
-          label: 'Conditions d\'utilisation',
-          onPress: () => {},
+          label: 'Mentions légales',
+          onPress: handleLegal,
         },
       ],
     },
@@ -111,7 +79,7 @@ export const SettingsScreen: React.FC = () => {
         <Text style={styles.title}>Paramètres</Text>
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
       >
@@ -127,47 +95,30 @@ export const SettingsScreen: React.FC = () => {
                     itemIndex === section.items.length - 1 && styles.lastItem,
                   ]}
                   onPress={item.onPress}
-                  disabled={item.isToggle}
-                  activeOpacity={item.isToggle ? 1 : 0.7}
+                  activeOpacity={0.7}
                 >
                   <View style={styles.settingLeft}>
-                    <Ionicons 
-                      name={item.icon as any} 
-                      size={24} 
-                      color={Colors.text.secondary} 
+                    <Ionicons
+                      name={item.icon as any}
+                      size={24}
+                      color={Colors.accent.blue}
                     />
                     <Text style={styles.settingLabel}>{item.label}</Text>
                   </View>
-                  {item.isToggle ? (
-                    <Switch
-                      value={item.value}
-                      onValueChange={item.onToggle}
-                      trackColor={{ 
-                        false: Colors.gray[300], 
-                        true: Colors.accent.blue 
-                      }}
-                      thumbColor={Colors.surface}
-                    />
-                  ) : (
-                    <View style={styles.settingRight}>
-                      {item.value && (
-                        <Text style={styles.settingValue}>{item.value}</Text>
-                      )}
-                      <Ionicons 
-                        name="chevron-forward" 
-                        size={20} 
-                        color={Colors.text.tertiary} 
-                      />
-                    </View>
-                  )}
+                  <Ionicons
+                    name="chevron-forward"
+                    size={20}
+                    color={Colors.text.tertiary}
+                  />
                 </TouchableOpacity>
               ))}
             </View>
           </View>
         ))}
 
-        <TouchableOpacity style={styles.logoutButton} activeOpacity={0.8} onPress={handleSignOut}>
-          <Text style={styles.logoutText}>Se déconnecter</Text>
+        <TouchableOpacity style={styles.signOutButton} activeOpacity={0.8} onPress={handleSignOut}>
+          <Ionicons name="log-out-outline" size={24} color={Colors.accent.red} />
+          <Text style={styles.signOutText}>Se déconnecter</Text>
         </TouchableOpacity>
 
         <View style={styles.footer}>
@@ -244,16 +195,19 @@ const styles = StyleSheet.create({
     ...Typography.subheadline,
     color: Colors.text.secondary,
   },
-  logoutButton: {
+  signOutButton: {
     backgroundColor: Colors.accent.red + '15',
     marginHorizontal: 16,
     marginTop: 16,
     marginBottom: 32,
-    borderRadius: 12,
+    borderRadius: DesignTokens.radii.xl,
     padding: 16,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
-  logoutText: {
+  signOutText: {
     ...Typography.headline,
     color: Colors.accent.red,
   },

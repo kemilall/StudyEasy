@@ -68,9 +68,14 @@ export class DataService {
   // Update subject
   static async updateSubject(subjectId: string, updates: Partial<Subject>): Promise<void> {
     try {
+      // Remove undefined fields to prevent Firebase errors
+      const cleanUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([_, value]) => value !== undefined)
+      );
+      
       const subjectRef = doc(db, 'subjects', subjectId);
       await updateDoc(subjectRef, {
-        ...updates,
+        ...cleanUpdates,
         updatedAt: Timestamp.fromDate(new Date())
       });
     } catch (error) {
@@ -161,9 +166,14 @@ export class DataService {
   // Update lesson
   static async updateLesson(lessonId: string, updates: Partial<Lesson>): Promise<void> {
     try {
+      // Remove undefined fields to prevent Firebase errors
+      const cleanUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([_, value]) => value !== undefined)
+      );
+      
       const lessonRef = doc(db, 'lessons', lessonId);
       await updateDoc(lessonRef, {
-        ...updates,
+        ...cleanUpdates,
         updatedAt: Timestamp.fromDate(new Date())
       });
     } catch (error) {

@@ -85,7 +85,7 @@ export const HomeScreen: React.FC = () => {
 
   const handleImportCoursePress = () => {
     // Analytics event would go here
-    navigation.navigate('CreateLesson' as never);
+    navigation.navigate('ImportCourse' as never);
   };
 
   const handleCourseOpen = (course: Lesson) => {
