@@ -235,7 +235,7 @@ export const FlashcardsScreen: React.FC = () => {
     }
     mjx-container[display="true"] {
       display: block;
-      margin: 8px 0 !important;
+      margin: 8px 0 2px 0 !important;
       max-width: 100%;
       overflow-x: auto;
     }
