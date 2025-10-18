@@ -5,6 +5,7 @@ import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { Ionicons } from '@expo/vector-icons';
 import { MathText } from './MathText';
+import { WebView } from 'react-native-webview';
 
 interface StructuredCourseViewProps {
   course: StructuredCourse;
@@ -156,6 +157,93 @@ const FormattedText: React.FC<{ text: string; style?: any }> = ({ text, style })
   return <FormattedTextInline text={text} style={style} />;
 };
 
+// Component to render mixed markdown and LaTeX in HTML
+const MixedContentLine: React.FC<{ text: string; style?: any }> = ({ text, style }) => {
+  // Convert markdown to HTML while preserving LaTeX
+  const convertToHtml = (content: string): string => {
+    // Convert **bold** to <strong>bold</strong>
+    let html = content.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    // Convert *italic* to <em>italic</em>
+    html = html.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+    return html;
+  };
+
+  const htmlContent = convertToHtml(text);
+  
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+      <script>
+        window.MathJax = {
+          tex: {
+            inlineMath: [['\\\\(', '\\\\)']],
+            displayMath: [['\\\\[', '\\\\]']]
+          },
+          svg: {
+            fontCache: 'global',
+            scale: 1
+          }
+        };
+      </script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.min.js"></script>
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        html, body {
+          margin: 0;
+          padding: 0;
+          overflow: hidden;
+        }
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+          font-size: 16px;
+          line-height: 28px;
+          color: #1a1a1a;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+          padding: 0;
+        }
+        strong {
+          font-weight: 700;
+        }
+        em {
+          font-style: italic;
+        }
+        mjx-container {
+          display: inline !important;
+          margin: 0 !important;
+        }
+        mjx-container svg {
+          vertical-align: middle;
+          max-width: 100%;
+        }
+      </style>
+    </head>
+    <body>
+      ${htmlContent}
+    </body>
+    </html>
+  `;
+
+  return (
+    <WebView
+      originWhitelist={['*']}
+      source={{ html }}
+      style={{ height: 30, backgroundColor: 'transparent', marginVertical: 0 }}
+      scrollEnabled={false}
+      showsVerticalScrollIndicator={false}
+      showsHorizontalScrollIndicator={false}
+      bounces={false}
+      overScrollMode="never"
+    />
+  );
+};
+
 // Component for definition formatting (Term: Definition)
 const DefinitionText: React.FC<{ text: string; style?: any }> = ({ text, style }) => {
   // Check if text contains a colon pattern for "Term : Definition"
@@ -178,12 +266,25 @@ const DefinitionText: React.FC<{ text: string; style?: any }> = ({ text, style }
   return <FormattedText text={text} style={style} />;
 };
 const FormattedTextInline: React.FC<{ text: string; style?: any }> = ({ text, style }) => {
+  // Helper to check if text has markdown
+  const hasMarkdown = (str: string) => /\*\*[^*]+\*\*|\*[^*]+\*/.test(str);
+  // Helper to check if text has LaTeX
+  const hasLatex = (str: string) => str.includes('\\(') || str.includes('\\[');
+  
   // Split text by line breaks first
   const lines = text.split('\n');
   
   if (lines.length === 1) {
-    // Single line - check if THIS line contains LaTeX
-    if (text.includes('\\(') || text.includes('\\[')) {
+    const hasMd = hasMarkdown(text);
+    const hasMath = hasLatex(text);
+    
+    // If has both markdown and LaTeX, use HTML rendering
+    if (hasMd && hasMath) {
+      return <MixedContentLine text={text} style={style} />;
+    }
+    
+    // If has only LaTeX, use MathText
+    if (hasMath) {
       return <MathText fontSize={16} lineHeight={22} style={{ ...(style || {}), textAlign: 'left' }}>{text}</MathText>;
     }
     
@@ -224,8 +325,16 @@ const FormattedTextInline: React.FC<{ text: string; style?: any }> = ({ text, st
           return <View key={lineIndex} style={{ height: 8 }} />;
         }
         
-        // Check if this specific line contains LaTeX
-        if (line.includes('\\(') || line.includes('\\[')) {
+        const hasMd = hasMarkdown(line);
+        const hasMath = hasLatex(line);
+        
+        // If has both markdown and LaTeX, use HTML rendering
+        if (hasMd && hasMath) {
+          return <MixedContentLine key={lineIndex} text={line} style={style} />;
+        }
+        
+        // If has only LaTeX, use MathText
+        if (hasMath) {
           return <MathText key={lineIndex} fontSize={16} lineHeight={22} style={{ ...(style || {}), textAlign: 'left' }}>{line}</MathText>;
         }
         
