@@ -15,6 +15,7 @@ import { Typography } from '../constants/typography';
 import { useAuth } from '../contexts/AuthContext';
 import { DataService } from '../services/dataService';
 import { Lesson, QuizQuestion } from '../types';
+import { MathText } from '../components/MathText';
 
 export const QuizScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -193,7 +194,9 @@ export const QuizScreen: React.FC = () => {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.questionCard}>
-          <Text style={styles.questionText}>{currentQuestion.question}</Text>
+          <MathText fontSize={18} lineHeight={26} style={styles.questionText}>
+            {currentQuestion.question}
+          </MathText>
         </View>
 
         <View style={styles.answersContainer}>
@@ -226,7 +229,11 @@ export const QuizScreen: React.FC = () => {
                     {String.fromCharCode(65 + index)}
                   </Text>
                 </View>
-                <Text style={textStyle}>{option}</Text>
+                <View style={{ flex: 1 }}>
+                  <MathText fontSize={16} lineHeight={22} style={textStyle}>
+                    {option}
+                  </MathText>
+                </View>
                 {showResult && index === currentQuestion.correctAnswer && (
                   <Ionicons name="checkmark" size={20} color={Colors.accent.green} />
                 )}
@@ -241,7 +248,9 @@ export const QuizScreen: React.FC = () => {
         {showResult && (
           <View style={styles.explanationCard}>
             <Text style={styles.explanationTitle}>Explication</Text>
-            <Text style={styles.explanationText}>{currentQuestion.explanation}</Text>
+            <MathText fontSize={16} lineHeight={22} style={styles.explanationText}>
+              {currentQuestion.explanation}
+            </MathText>
           </View>
         )}
       </ScrollView>

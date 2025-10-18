@@ -227,10 +227,10 @@ GUIDE D'UTILISATION DES TYPES DE CONTENU :
      * Liste à puces : "\\n- Premier point\\n- Deuxième point"
      * Liste numérotée : "\\n1. Première étape\\n2. Deuxième étape"
    - Gras seulement pour les mots-clés essentiels
-   - Formules inline : $formule$ dans le texte
-   - Pour les flèches : utilise → ← ⇒ ⇐ ou $\\rightarrow$ $\\leftarrow$
-   - Chimie : $H_2O$ (eau), $CO_2$ (dioxyde de carbone), $Na^+$ (ion sodium)
-   - Puissances : $x^2$ (x au carré), $10^{-3}$ (10 puissance -3)
+   - Formules inline : \\( formule \\) dans le texte (utilise \\( et \\) pour délimiter)
+   - Pour les flèches : utilise → ← ⇒ ⇐ ou \\( \\rightarrow \\) \\( \\leftarrow \\)
+   - Chimie : \\( H_2O \\) (eau), \\( CO_2 \\) (dioxyde de carbone), \\( Na^+ \\) (ion sodium)
+   - Puissances : \\( x^2 \\) (x au carré), \\( 10^{-3} \\) (10 puissance -3)
 
 2. **DÉFINITION** : Pour les termes techniques importants.
    - "titre" = le terme à définir
@@ -242,8 +242,8 @@ GUIDE D'UTILISATION DES TYPES DE CONTENU :
    - Utilise des listes quand cela aide à clarifier les étapes
 
 4. **FORMULE** : Pour les expressions mathématiques.
-   - Format : $$formule$$ pour les formules en bloc
-   - Dans le texte : $formule$ pour les formules inline
+   - Format : \\[ formule \\] pour les formules en bloc (utilise \\[ et \\] pour délimiter)
+   - Dans le texte : \\( formule \\) pour les formules inline (utilise \\( et \\) pour délimiter)
 
 5. **MINDMAP** : Pour visualiser les relations entre concepts.
    - Format Mermaid avec structure claire
@@ -263,7 +263,7 @@ STRUCTURE OBLIGATOIRE D'UNE SECTION :
       "contenu": [
         {
           "type": "texte",
-          "valeur": "Le **concept principal** se définit par ses caractéristiques essentielles.\\n\\nIl existe trois aspects fondamentaux :\\n\\n1. Premier aspect avec explication\\n2. Deuxième aspect important\\n3. Troisième aspect complémentaire\\n\\nLa formule $f(x) = ax + b$ représente la forme générale."
+          "valeur": "Le **concept principal** se définit par ses caractéristiques essentielles.\\n\\nIl existe trois aspects fondamentaux :\\n\\n1. Premier aspect avec explication\\n2. Deuxième aspect important\\n3. Troisième aspect complémentaire\\n\\nLa formule \\( f(x) = ax + b \\) représente la forme générale."
         },
         {
           "type": "definition",
@@ -368,11 +368,11 @@ CONSIGNES CRITIQUES :
    - Au moins un exemple concret
    - Structure adaptée au contenu
 6. Pour les formules et symboles :
-   - Formules inline : $formule$ dans le texte
+   - Formules inline : \\( formule \\) dans le texte (utilise \\( et \\) pour délimiter)
    - Flèches directes : → ← ⇒ ⇐ ↔
-   - Ou LaTeX : $\\rightarrow$ $\\leftarrow$ etc.
-   - Notations chimiques : $H_2O$, $CO_2$, $Na^+$, $Cl^-$
-   - Puissances : $x^2$, $10^3$, $E = mc^2$
+   - Ou LaTeX : \\( \\rightarrow \\) \\( \\leftarrow \\) etc.
+   - Notations chimiques : \\( H_2O \\), \\( CO_2 \\), \\( Na^+ \\), \\( Cl^- \\)
+   - Puissances : \\( x^2 \\), \\( 10^3 \\), \\( E = mc^2 \\)
 7. Privilégie la clarté et l'aération naturelle du texte"""
                         }
                     ],
@@ -816,13 +816,33 @@ Create challenging but fair multiple-choice questions that test understanding of
 Each question should have exactly 3 options with one correct answer.
 Provide clear explanations for the correct answer.
 
+## FORMAT DES FORMULES (LATEX)
+
+Pour toutes les formules mathématiques et scientifiques:
+- **Formules inline** (dans le texte): utilisez \\( formule \\)
+  Exemple: La vitesse \\( v \\) est constante
+- **Formules display** (centrées, importantes): utilisez \\[ formule \\]
+  Exemple: \\[ E = mc^2 \\]
+
+**SYNTAX LaTeX**:
+- Fractions: \\frac{num}{den}
+- Indices: H_2O, E_c
+- Exposants: x^2, 10^{-3}
+- Lettres grecques: \\alpha \\beta \\gamma \\Delta \\pi \\theta
+- Opérateurs: \\times \\div \\leq \\geq \\approx
+
+**IMPORTANT**: Dans le JSON, doubler tous les backslash!
+- Écrire \\\\[ au lieu de \\[
+- Écrire \\\\( au lieu de \\(
+- Exemple: "La formule \\\\( E_c = \\\\frac{1}{2}mv^2 \\\\) représente..."
+
 Return a JSON array of quiz questions with this exact structure:
 [
   {
-    "question": "string",
-    "options": ["option1", "option2", "option3"],
+    "question": "string (peut contenir des formules LaTeX)",
+    "options": ["option1", "option2 avec \\\\( x^2 \\\\)", "option3"],
     "correct_answer": 0,
-    "explanation": "string"
+    "explanation": "string (peut contenir des formules LaTeX)"
   }
 ]
 

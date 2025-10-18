@@ -4,6 +4,7 @@ import { StructuredCourse, ContentItem, CourseSection, Lesson } from '../types';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { Ionicons } from '@expo/vector-icons';
+import { MathText } from './MathText';
 
 interface StructuredCourseViewProps {
   course: StructuredCourse;
@@ -59,15 +60,15 @@ const MindmapVisualizer: React.FC<{ mermaidCode: string }> = ({ mermaidCode }) =
   if (nodes.length === 0) {
     // Fallback to showing the code if parsing fails
     return (
-      <View style={styles.mindmapContent}>
-        <Text style={styles.mindmapLabel}>Diagramme Mental:</Text>
-        <Text style={styles.mindmapCode}>{mermaidCode}</Text>
+      <View style={styles.mindmapContent} testID="mindmap-content-fallback">
+        <Text style={styles.mindmapLabel} testID="mindmap-label">Diagramme Mental:</Text>
+        <Text style={styles.mindmapCode} testID="mindmap-code">{mermaidCode}</Text>
       </View>
     );
   }
   
   return (
-    <View style={styles.mindmapContainer}>
+    <View style={styles.mindmapContainer} testID="mindmap-container">
       {nodes.map((node, index) => (
         <View
           key={index}
@@ -76,18 +77,19 @@ const MindmapVisualizer: React.FC<{ mermaidCode: string }> = ({ mermaidCode }) =
             node.isRoot && styles.mindmapRootNode,
             { marginLeft: node.level * 24 }
           ]}
+          testID={`mindmap-node-${index}`}
         >
           {!node.isRoot && node.level > 0 && (
-            <View style={styles.mindmapConnector} />
+            <View style={styles.mindmapConnector} testID={`mindmap-connector-${index}`} />
           )}
           <View style={[
             styles.mindmapNodeContent,
             node.isRoot && styles.mindmapRootContent
-          ]}>
+          ]} testID={`mindmap-node-content-${index}`}>
             <Text style={[
               styles.mindmapNodeText,
               node.isRoot && styles.mindmapRootText
-            ]}>
+            ]} testID={`mindmap-node-text-${index}`}>
               {node.text}
             </Text>
           </View>
@@ -176,6 +178,84 @@ const DefinitionText: React.FC<{ text: string; style?: any }> = ({ text, style }
   return <FormattedText text={text} style={style} />;
 };
 const FormattedTextInline: React.FC<{ text: string; style?: any }> = ({ text, style }) => {
+  // If line contains LaTeX, render with MathText but keep alignment left
+  if (text.includes('\\(') || text.includes('\\[')) {
+    return <MathText fontSize={16} lineHeight={22} style={{ ...(style || {}), textAlign: 'left' }}>{text}</MathText>;
+  }
+  
+  // Split text by line breaks first
+  const lines = text.split('\n');
+  
+  if (lines.length === 1) {
+    // Single line - handle inline formatting only (no old $ formulas)
+    // Split by bold/italic formatting
+    const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+    
+    return (
+      <Text style={style} selectable={true}>
+        {parts.map((part, index) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            // Bold text
+            return (
+              <Text key={index} style={[style, { fontWeight: '700' }]}>
+                {part.slice(2, -2)}
+              </Text>
+            );
+          } else if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
+            // Italic text
+            return (
+              <Text key={index} style={[style, { fontStyle: 'italic' }]}>
+                {part.slice(1, -1)}
+              </Text>
+            );
+          }
+          return <Text key={index}>{part}</Text>;
+        })}
+      </Text>
+    );
+  }
+  
+  // Multiple lines - render each line separately
+  return (
+    <View>
+      {lines.map((line, lineIndex) => {
+        if (!line.trim()) {
+          // Empty line - add spacing
+          return <View key={lineIndex} style={{ height: 8 }} />;
+        }
+        
+        // Process formatting for this line
+        const parts = line.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+        
+        return (
+          <Text key={lineIndex} style={style} selectable={true}>
+            {parts.map((part, partIndex) => {
+              if (part.startsWith('**') && part.endsWith('**')) {
+                // Bold text
+                return (
+                  <Text key={`${lineIndex}-${partIndex}`} style={[style, { fontWeight: '700' }]}>
+                    {part.slice(2, -2)}
+                  </Text>
+                );
+              } else if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
+                // Italic text
+                return (
+                  <Text key={`${lineIndex}-${partIndex}`} style={[style, { fontStyle: 'italic' }]}>
+                    {part.slice(1, -1)}
+                  </Text>
+                );
+              }
+              return <Text key={`${lineIndex}-${partIndex}`}>{part}</Text>;
+            })}
+          </Text>
+        );
+      })}
+    </View>
+  );
+};
+
+// DEPRECATED - Old formula handler kept for backwards compatibility
+const OldFormattedTextInline: React.FC<{ text: string; style?: any }> = ({ text, style }) => {
   // Split text by line breaks first
   const lines = text.split('\n');
   
@@ -270,14 +350,14 @@ const FormattedTextInline: React.FC<{ text: string; style?: any }> = ({ text, st
             if (part.startsWith('**') && part.endsWith('**')) {
               // Bold text
               return (
-                <Text key={`${formulaIndex}-${index}`} style={{ fontWeight: '700' }}>
+                <Text key={`${formulaIndex}-${index}`} style={[style, { fontWeight: '700' }]}>
                   {part.slice(2, -2)}
                 </Text>
               );
             } else if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
               // Italic text
               return (
-                <Text key={`${formulaIndex}-${index}`} style={{ fontStyle: 'italic' }}>
+                <Text key={`${formulaIndex}-${index}`} style={[style, { fontStyle: 'italic' }]}>
                   {part.slice(1, -1)}
                 </Text>
               );
@@ -387,14 +467,14 @@ const FormattedTextInline: React.FC<{ text: string; style?: any }> = ({ text, st
                 if (part.startsWith('**') && part.endsWith('**')) {
                   // Bold text
                   return (
-                    <Text key={`${lineIndex}-${formulaIndex}-${partIndex}`} style={{ fontWeight: '700' }}>
+                    <Text key={`${lineIndex}-${formulaIndex}-${partIndex}`} style={[style, { fontWeight: '700' }]}>
                       {part.slice(2, -2)}
                     </Text>
                   );
                 } else if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
                   // Italic text
                   return (
-                    <Text key={`${lineIndex}-${formulaIndex}-${partIndex}`} style={{ fontStyle: 'italic' }}>
+                    <Text key={`${lineIndex}-${formulaIndex}-${partIndex}`} style={[style, { fontStyle: 'italic' }]}>
                       {part.slice(1, -1)}
                     </Text>
                   );
@@ -415,127 +495,49 @@ const ContentItemComponent: React.FC<{ item: ContentItem; level?: number }> = ({
     switch (item.type) {
       case 'texte':
         return (
-          <View style={styles.textBlock}>
+          <View style={styles.textBlock} testID="content-text-block">
             <FormattedText text={item.valeur || ''} style={styles.textContent} />
           </View>
         );
 
       case 'exemple':
         return (
-          <View style={styles.exampleBlock}>
-            <Text style={styles.exampleLabel}>Exemple</Text>
-            {item.titre && <Text style={styles.blockTitle} selectable={true}>{item.titre}</Text>}
+          <View style={styles.exampleBlock} testID="content-example-block">
+            <Text style={styles.exampleLabel} testID="example-label">Exemple</Text>
+            {item.titre && <Text style={styles.blockTitle} selectable={true} testID="example-title">📌 {item.titre}</Text>}
             <FormattedText text={item.valeur || ''} style={styles.exampleContent} />
           </View>
         );
 
       case 'formule':
-        // Clean up LaTeX formula and display it
-        const cleanedFormula = (item.valeur || '')
-          .replace(/\$\$/g, '')
-          .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1)/($2)')
-          .replace(/\\sqrt\{([^}]+)\}/g, '√($1)')
-          .replace(/\\int/g, '∫')
-          .replace(/\\sum/g, '∑')
-          .replace(/\\pi/g, 'π')
-          .replace(/\\theta/g, 'θ')
-          .replace(/\\lambda/g, 'λ')
-          .replace(/\\alpha/g, 'α')
-          .replace(/\\beta/g, 'β')
-          .replace(/\\gamma/g, 'γ')
-          .replace(/\\delta/g, 'δ')
-          .replace(/\\epsilon/g, 'ε')
-          .replace(/\\sigma/g, 'σ')
-          .replace(/\\mu/g, 'μ')
-          .replace(/\\omega/g, 'ω')
-          .replace(/\\phi/g, 'φ')
-          .replace(/\\psi/g, 'ψ')
-          .replace(/\\rho/g, 'ρ')
-          .replace(/\\tau/g, 'τ')
-          .replace(/\\eta/g, 'η')
-          .replace(/\\zeta/g, 'ζ')
-          .replace(/\\xi/g, 'ξ')
-          .replace(/\\rightarrow/g, '→')
-          .replace(/\\leftarrow/g, '←')
-          .replace(/\\Rightarrow/g, '⇒')
-          .replace(/\\Leftarrow/g, '⇐')
-          .replace(/\\leftrightarrow/g, '↔')
-          .replace(/\\Leftrightarrow/g, '⇔')
-          .replace(/\\uparrow/g, '↑')
-          .replace(/\\downarrow/g, '↓')
-          .replace(/\\updownarrow/g, '↕')
-          .replace(/\\times/g, '×')
-          .replace(/\\div/g, '÷')
-          .replace(/\\pm/g, '±')
-          .replace(/\\mp/g, '∓')
-          .replace(/\\approx/g, '≈')
-          .replace(/\\neq/g, '≠')
-          .replace(/\\leq/g, '≤')
-          .replace(/\\geq/g, '≥')
-          .replace(/\\ll/g, '≪')
-          .replace(/\\gg/g, '≫')
-          .replace(/\\infty/g, '∞')
-          .replace(/\\partial/g, '∂')
-          .replace(/\\nabla/g, '∇')
-          .replace(/\\forall/g, '∀')
-          .replace(/\\exists/g, '∃')
-          .replace(/\\in/g, '∈')
-          .replace(/\\notin/g, '∉')
-          .replace(/\\subset/g, '⊂')
-          .replace(/\\supset/g, '⊃')
-          .replace(/\\subseteq/g, '⊆')
-          .replace(/\\supseteq/g, '⊇')
-          .replace(/\\cup/g, '∪')
-          .replace(/\\cap/g, '∩')
-          .replace(/\\emptyset/g, '∅')
-          .replace(/\\cdot/g, '·')
-          .replace(/\\ldots/g, '…')
-          .replace(/\\cdots/g, '⋯')
-          .replace(/\\vdots/g, '⋮')
-          .replace(/\\ddots/g, '⋱')
-          // Chemical notation - charges
-          .replace(/\^(\+)/g, '⁺')
-          .replace(/\^(\-)/g, '⁻')
-          // Superscripts for powers (single digits)
-          .replace(/\^0/g, '⁰')
-          .replace(/\^1/g, '¹')
-          .replace(/\^2/g, '²')
-          .replace(/\^3/g, '³')
-          .replace(/\^4/g, '⁴')
-          .replace(/\^5/g, '⁵')
-          .replace(/\^6/g, '⁶')
-          .replace(/\^7/g, '⁷')
-          .replace(/\^8/g, '⁸')
-          .replace(/\^9/g, '⁹')
-          // Subscripts for chemical formulas (single digits)
-          .replace(/_0/g, '₀')
-          .replace(/_1/g, '₁')
-          .replace(/_2/g, '₂')
-          .replace(/_3/g, '₃')
-          .replace(/_4/g, '₄')
-          .replace(/_5/g, '₅')
-          .replace(/_6/g, '₆')
-          .replace(/_7/g, '₇')
-          .replace(/_8/g, '₈')
-          .replace(/_9/g, '₉');
-
+        // Display formula using MathText with LaTeX support
+        // Wrap in \[ \] for display mode if not already wrapped
+        const formulaValue = item.valeur || '';
+        const formulaContent = formulaValue.startsWith('\\[') ? formulaValue : `\\[ ${formulaValue} \\]`;
+        
         return (
-          <View style={styles.formulaBlock}>
-            {item.titre && <Text style={styles.blockTitle} selectable={true}>{item.titre}</Text>}
-            <FormattedTextInline text={cleanedFormula} style={styles.formulaContent} />
+          <View style={styles.formulaBlock} testID="content-formula-block">
+            {item.titre && <Text style={styles.blockTitle} selectable={true} testID="formula-title">📐 {item.titre}</Text>}
+            <MathText fontSize={18} style={styles.formulaContent}>
+              {formulaContent}
+            </MathText>
           </View>
         );
 
       case 'definition':
         return (
-          <View style={styles.definitionBlock}>
-            <Text style={styles.definitionContent} selectable={true}>
-              <Text style={{ color: Colors.accentGreen, fontWeight: '600' }}>
-                {item.titre}
-              </Text>
-              <Text> : </Text>
-              <FormattedText text={item.valeur || ''} style={styles.definitionContent} />
-            </Text>
+          <View style={styles.definitionBlock} testID="content-definition-block">
+            <View style={styles.definitionContainer}>
+              <View style={styles.definitionTermBox}>
+                <Text style={styles.definitionTermText}>
+                  {item.titre}
+                </Text>
+              </View>
+              <Text style={styles.definitionSeparator}> : </Text>
+              <View style={styles.definitionValueBox}>
+                <FormattedText text={item.valeur || ''} style={styles.definitionValueText} />
+              </View>
+            </View>
           </View>
         );
 
@@ -543,40 +545,46 @@ const ContentItemComponent: React.FC<{ item: ContentItem; level?: number }> = ({
         // Parse and display Mermaid mindmap as a visual structure
         const mermaidCode = (item.valeur || '').replace(/```mermaid\n?/, '').replace(/```$/, '').trim();
         return (
-          <View style={styles.mindmapBlock}>
-            {item.titre && <Text style={styles.blockTitle} selectable={true}>{item.titre}</Text>}
+          <View style={styles.mindmapBlock} testID="content-mindmap-block">
+            {item.titre && <Text style={styles.blockTitle} selectable={true} testID="mindmap-title">🧠 {item.titre}</Text>}
             <MindmapVisualizer mermaidCode={mermaidCode} />
           </View>
         );
 
       case 'sous-section':
         return (
-          <View style={[styles.subsection, level > 0 && styles.nestedSubsection]}>
-            {item.titre && <Text style={[styles.subsectionTitle, level > 0 && styles.nestedSubsectionTitle]}>{item.titre}</Text>}
-            {item.contenu && item.contenu.map((subItem, index) => (
-              <ContentItemComponent key={index} item={subItem} level={level + 1} />
-            ))}
+          <View style={[styles.subsection, level > 0 && styles.nestedSubsection]} testID={`subsection-level-${level}`}>
+            {item.titre && <FormattedText text={item.titre} style={[styles.subsectionTitle, level > 0 && styles.nestedSubsectionTitle]} />}
+            <View style={{ marginTop: 8 }}>
+              {item.contenu && item.contenu.map((subItem, index) => (
+                <View key={index} style={{ marginBottom: 12, position: 'relative' }}>
+                  <ContentItemComponent item={subItem} level={level + 1} />
+                </View>
+              ))}
+            </View>
           </View>
         );
 
       default:
         return (
-          <Text style={styles.textContent} selectable={true}>
-            {item.valeur || ''}
-          </Text>
+          <View style={{ position: 'relative' }}>
+            <Text style={styles.textContent} selectable={true} testID="default-content-text">
+              {item.valeur || ''}
+            </Text>
+          </View>
         );
     }
   };
 
-  return <View style={styles.contentItem}>{renderContent()}</View>;
+  return <View style={styles.contentItem} testID="content-item">{renderContent()}</View>;
 };
 
 // Component to render a course section
 const CourseSectionComponent: React.FC<{ section: CourseSection; index: number }> = ({ section, index }) => {
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{section.titre}</Text>
-      <View style={styles.sectionContent}>
+    <View style={styles.section} testID={`course-section-${index}`}>
+      <Text style={styles.sectionTitle} testID={`section-title-${index}`}>{section.titre}</Text>
+      <View style={styles.sectionContent} testID={`section-content-${index}`}>
         {section.contenu.map((item, itemIndex) => (
           <ContentItemComponent key={itemIndex} item={item} />
         ))}
@@ -591,6 +599,13 @@ export const StructuredCourseView: React.FC<StructuredCourseViewProps> = ({
   onMarkComplete,
   onNavigate 
 }) => {
+  // Log du contenu brut du cours uniquement
+  console.log('========================================');
+  console.log('📚 CONTENU DU COURS BRUT');
+  console.log('========================================');
+  console.log(JSON.stringify(course, null, 2));
+  console.log('========================================');
+
   const formatDate = (date: Date) => {
     const options: Intl.DateTimeFormatOptions = { 
       year: 'numeric', 
@@ -601,64 +616,72 @@ export const StructuredCourseView: React.FC<StructuredCourseViewProps> = ({
   };
 
   return (
-    <View style={styles.mainContainer}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <View style={styles.mainContainer} testID="main-container">
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false} testID="main-scroll-view">
         {/* Title */}
-        <Text style={styles.lessonTitle} selectable={true}>
-          {course.titre_cours}
-        </Text>
+        <View style={{ position: 'relative' }}>
+          <Text style={styles.lessonTitle} selectable={true} testID="lesson-title">
+            {course.titre_cours}
+          </Text>
+        </View>
 
         {/* Metadata */}
-        <View style={styles.metadataRow}>
-          <View style={styles.subjectPill}>
-            <Text style={styles.subjectPillText}>{lesson?.subjectName || 'Matière'}</Text>
+        <View style={styles.metadataRow} testID="metadata-section">
+          <View style={styles.subjectPill} testID="subject-pill">
+            <Text style={styles.subjectPillText} testID="subject-pill-text">{lesson?.subjectName || 'Matière'}</Text>
           </View>
-          <Text style={styles.dateText}>
+          <Text style={styles.dateText} testID="date-text">
             • {lesson?.createdAt ? formatDate(lesson.createdAt) : formatDate(new Date())}
           </Text>
         </View>
 
         {/* Action Buttons */}
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          style={styles.actionButtonsScrollView}
-          contentContainerStyle={styles.actionButtonsContainer}
-        >
-          {lesson?.flashcards && lesson.flashcards.length > 0 && (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => onNavigate?.('Flashcards', { lessonId: lesson.id })}
-            >
-              <Ionicons name="layers-outline" size={18} color={Colors.textPrimary} />
-              <Text style={styles.actionButtonText}>Réviser les flashcards</Text>
-            </TouchableOpacity>
-          )}
-
-          {lesson?.quiz && lesson.quiz.length > 0 && (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => onNavigate?.('Quiz', { lessonId: lesson.id })}
-            >
-              <Ionicons name="checkmark-circle-outline" size={18} color={Colors.textPrimary} />
-              <Text style={styles.actionButtonText}>Faire le quiz</Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => {/* Handle edit */}}
+        <View style={{ position: 'relative', marginBottom: 32 }}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.actionButtonsScrollView}
+            contentContainerStyle={styles.actionButtonsContainer}
+            testID="action-buttons-scroll-view"
           >
-            <Ionicons name="create-outline" size={18} color={Colors.textPrimary} />
-            <Text style={styles.actionButtonText}>Modifier</Text>
-          </TouchableOpacity>
-        </ScrollView>
+            {lesson?.flashcards && lesson.flashcards.length > 0 && (
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => onNavigate?.('Flashcards', { lessonId: lesson.id })}
+                testID="flashcards-button"
+              >
+                <Ionicons name="layers-outline" size={18} color={Colors.textPrimary} testID="flashcards-icon" />
+                <Text style={styles.actionButtonText} testID="flashcards-button-text">Réviser les flashcards</Text>
+              </TouchableOpacity>
+            )}
+
+            {lesson?.quiz && lesson.quiz.length > 0 && (
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => onNavigate?.('Quiz', { lessonId: lesson.id })}
+                testID="quiz-button"
+              >
+                <Ionicons name="checkmark-circle-outline" size={18} color={Colors.textPrimary} testID="quiz-icon" />
+                <Text style={styles.actionButtonText} testID="quiz-button-text">Faire le quiz</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => {/* Handle edit */}}
+              testID="edit-button"
+            >
+              <Ionicons name="create-outline" size={18} color={Colors.textPrimary} testID="edit-icon" />
+              <Text style={styles.actionButtonText} testID="edit-button-text">Modifier</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
 
         {/* Description */}
         {course.description && (
-          <View style={styles.descriptionSection}>
-            <View style={styles.descriptionCard}>
-              <Text style={styles.descriptionTitle}>Description du cours</Text>
+          <View style={styles.descriptionSection} testID="description-section">
+            <View style={styles.descriptionCard} testID="description-card">
+              <Text style={styles.descriptionTitle} testID="description-title">Description du cours</Text>
               <FormattedText text={course.description} style={styles.descriptionText} />
             </View>
           </View>
@@ -666,9 +689,9 @@ export const StructuredCourseView: React.FC<StructuredCourseViewProps> = ({
 
         {/* Introduction */}
         {course.introduction?.texte && (
-          <View style={styles.introductionSection}>
-            <View style={styles.introductionCard}>
-              <Text style={styles.introductionTitle}>Introduction</Text>
+          <View style={styles.introductionSection} testID="introduction-section">
+            <View style={styles.introductionCard} testID="introduction-card">
+              <Text style={styles.introductionTitle} testID="introduction-title">Introduction</Text>
               <FormattedText text={course.introduction.texte} style={styles.introductionText} />
             </View>
           </View>
@@ -676,12 +699,12 @@ export const StructuredCourseView: React.FC<StructuredCourseViewProps> = ({
 
         {/* Course Plan */}
         {course.plan && course.plan.length > 0 && (
-          <View style={styles.planSection}>
-            <Text style={styles.planTitle}>Plan du cours</Text>
-            <View style={styles.planCard}>
+          <View style={styles.planSection} testID="plan-section">
+            <Text style={styles.planTitle} testID="plan-title">Plan du cours</Text>
+            <View style={styles.planCard} testID="plan-card">
               {course.plan.map((item, index) => (
-                <View key={index} style={styles.planItem}>
-                  <Text style={styles.planNumber}>{index + 1}.</Text>
+                <View key={index} style={[styles.planItem, { position: 'relative' }]} testID={`plan-item-${index}`}>
+                  <Text style={styles.planNumber} testID={`plan-number-${index}`}>{index + 1}.</Text>
                   <FormattedTextInline text={item} style={styles.planText} />
                 </View>
               ))}
@@ -700,9 +723,9 @@ export const StructuredCourseView: React.FC<StructuredCourseViewProps> = ({
 
         {/* Conclusion */}
         {course.conclusion?.texte && (
-          <View style={styles.conclusionSection}>
-            <View style={styles.conclusionCard}>
-              <Text style={styles.conclusionTitle}>Conclusion</Text>
+          <View style={styles.conclusionSection} testID="conclusion-section">
+            <View style={styles.conclusionCard} testID="conclusion-card">
+              <Text style={styles.conclusionTitle} testID="conclusion-title">Conclusion</Text>
               <FormattedText text={course.conclusion.texte} style={styles.conclusionText} />
             </View>
           </View>
@@ -710,23 +733,23 @@ export const StructuredCourseView: React.FC<StructuredCourseViewProps> = ({
 
         {/* References */}
         {course.references && course.references.length > 0 && (
-          <View style={styles.referencesSection}>
-            <Text style={styles.referencesTitle}>Références</Text>
-            <View style={styles.referencesCard}>
+          <View style={styles.referencesSection} testID="references-section">
+            <Text style={styles.referencesTitle} testID="references-title">Références</Text>
+            <View style={styles.referencesCard} testID="references-card">
               {course.references.map((reference, index) => (
-                <View key={index} style={styles.referenceItem}>
-                  <Text style={styles.referenceNumber}>{index + 1}.</Text>
-                  <View style={styles.referenceContent}>
+                <View key={index} style={[styles.referenceItem, { position: 'relative' }]} testID={`reference-item-${index}`}>
+                  <Text style={styles.referenceNumber} testID={`reference-number-${index}`}>{index + 1}.</Text>
+                  <View style={styles.referenceContent} testID={`reference-content-${index}`}>
                     <FormattedTextInline text={reference.titre} style={styles.referenceTitle} />
                     {reference.auteur && (
-                      <Text style={styles.referenceDetail} selectable={true}>
+                      <Text style={styles.referenceDetail} selectable={true} testID={`reference-author-${index}`}>
                         Par {reference.auteur}
                         {reference.annee && ` (${reference.annee})`}
                         {reference.editeur && ` - ${reference.editeur}`}
                       </Text>
                     )}
                     {reference.lien && (
-                      <Text style={styles.referenceLink} selectable={true}>
+                      <Text style={styles.referenceLink} selectable={true} testID={`reference-link-${index}`}>
                         {reference.lien}
                       </Text>
                     )}
@@ -738,7 +761,7 @@ export const StructuredCourseView: React.FC<StructuredCourseViewProps> = ({
         )}
 
         {/* Bottom spacing */}
-        <View style={{ height: 40 }} />
+        <View style={{ height: 40 }} testID="bottom-spacing" />
       </ScrollView>
     </View>
   );
@@ -928,7 +951,7 @@ const styles = StyleSheet.create({
   
   // Content Items
   contentItem: {
-    marginBottom: 20,
+    marginBottom: 6,
   },
   textBlock: {
     marginBottom: 8,
@@ -957,10 +980,10 @@ const styles = StyleSheet.create({
   // Example Block
   exampleBlock: {
     backgroundColor: Colors.primaryLavender + '10',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: 12,
-    marginVertical: 12,
+    marginVertical: 2,
     borderWidth: 1,
     borderColor: Colors.primaryLavender + '20',
   },
@@ -983,8 +1006,8 @@ const styles = StyleSheet.create({
   formulaBlock: {
     backgroundColor: Colors.primaryBlue + '10',
     borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     alignItems: 'center',
   },
   formulaContent: {
@@ -997,20 +1020,48 @@ const styles = StyleSheet.create({
   
   // Definition Block - Simple style without border
   definitionBlock: {
-    marginVertical: 4,
+    marginVertical: 2,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
-  definitionContent: {
+  definitionContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  definitionTermBox: {
+    backgroundColor: Colors.primaryLavender + '10',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: Colors.primaryLavender + '20',
+  },
+  definitionTermText: {
+    fontSize: 16,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  definitionSeparator: {
+    color: Colors.textSecondary,
+    marginHorizontal: 4,
+    marginTop: 6,
+  },
+  definitionValueBox: {
+    flex: 1,
+    marginTop: 6,
+  },
+  definitionValueText: {
     ...Typography.body,
     color: Colors.textPrimary,
     lineHeight: 26,
-    fontSize: 16,
   },
   
   // Mindmap Block
   mindmapBlock: {
     backgroundColor: Colors.warning + '08',
     borderRadius: 12,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderWidth: 1,
     borderColor: Colors.warning + '30',
   },
@@ -1105,12 +1156,13 @@ const styles = StyleSheet.create({
   subsectionTitle: {
     ...Typography.headline,
     color: Colors.accentGreen,
-    marginBottom: 16,
+    marginBottom: 8,
     fontWeight: '700',
     fontSize: 20,
   },
   nestedSubsectionTitle: {
     fontSize: 18,
+    marginBottom: 6,
   },
   
   // Conclusion

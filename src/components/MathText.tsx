@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextStyle, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextStyle, ActivityIndicator, StyleProp } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 interface MathTextProps {
   children: string;
   fontSize?: number;
   lineHeight?: number;
-  style?: TextStyle;
+  style?: StyleProp<TextStyle>;
 }
 
 export const MathText: React.FC<MathTextProps> = ({ 
@@ -16,7 +16,7 @@ export const MathText: React.FC<MathTextProps> = ({
   style 
 }) => {
   const [loading, setLoading] = useState(true);
-  const [height, setHeight] = useState(150);
+  const [height, setHeight] = useState(40);
 
   // Check if content contains LaTeX
   const hasLatex = children.includes('\\[') || children.includes('\\(');
@@ -31,12 +31,12 @@ export const MathText: React.FC<MathTextProps> = ({
   }
 
   // For LaTeX content, render everything in a single WebView
-  const textColor = String(style?.color || '#1a1a1a');
+  const textColor = String(StyleSheet.flatten(style as any)?.color || '#1a1a1a');
   
   // Prepare content - handle newlines properly
   const preparedContent = children
-    .replace(/\\n/g, '<br/><br/>')
-    .replace(/\n/g, '<br/><br/>');
+    .replace(/\\n/g, '<br/>')
+    .replace(/\n/g, '<br/>');
 
   const html = `
 <!DOCTYPE html>
@@ -57,20 +57,23 @@ export const MathText: React.FC<MathTextProps> = ({
       width: 100%;
       height: 100%;
       background: transparent;
+      overflow: hidden;
     }
     body {
-      padding: 20px;
+      padding: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       font-size: ${fontSize}px;
       color: ${textColor};
       line-height: ${lineHeight || fontSize * 1.4}px;
-      text-align: center;
+      text-align: left;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
     .katex-display {
-      margin: 15px 0;
+      margin: 8px 0 2px 0;
     }
     .katex {
-      font-size: 1.2em;
+      font-size: 1em;
     }
     .error {
       color: red;
@@ -105,7 +108,7 @@ export const MathText: React.FC<MathTextProps> = ({
         });
         
         // Send height after rendering
-        setTimeout(sendHeight, 100);
+        setTimeout(sendHeight, 50);
         
         // Debug - show what we're trying to render
         console.log('Content:', document.getElementById('content').innerHTML);
@@ -131,7 +134,7 @@ export const MathText: React.FC<MathTextProps> = ({
   return (
     <View style={styles.container}>
       {loading && (
-        <View style={[styles.loadingContainer, { height }]}>
+        <View style={[styles.loadingContainer, { height }] }>
           <ActivityIndicator size="small" color={textColor} />
         </View>
       )}
@@ -150,7 +153,7 @@ export const MathText: React.FC<MathTextProps> = ({
           try {
             const data = JSON.parse(event.nativeEvent.data);
             if (data.type === 'setHeight' && data.height) {
-              setHeight(Math.min(data.height + 20, 400)); // Max 400px
+              setHeight(Math.min(Math.max(data.height, 20), 600));
             }
           } catch (e) {
             console.warn('WebView message error:', e);
@@ -171,7 +174,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   plainText: {
-    textAlign: 'center',
+    textAlign: 'left',
   },
   webView: {
     backgroundColor: 'transparent',
