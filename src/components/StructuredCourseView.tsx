@@ -178,18 +178,18 @@ const DefinitionText: React.FC<{ text: string; style?: any }> = ({ text, style }
   return <FormattedText text={text} style={style} />;
 };
 const FormattedTextInline: React.FC<{ text: string; style?: any }> = ({ text, style }) => {
-  // If line contains LaTeX, render with MathText but keep alignment left
-  if (text.includes('\\(') || text.includes('\\[')) {
-    return <MathText fontSize={16} lineHeight={22} style={{ ...(style || {}), textAlign: 'left' }}>{text}</MathText>;
-  }
-  
   // Split text by line breaks first
   const lines = text.split('\n');
   
   if (lines.length === 1) {
-    // Single line - handle inline formatting only (no old $ formulas)
+    // Single line - check if THIS line contains LaTeX
+    if (text.includes('\\(') || text.includes('\\[')) {
+      return <MathText fontSize={16} lineHeight={22} style={{ ...(style || {}), textAlign: 'left' }}>{text}</MathText>;
+    }
+    
+    // Handle inline formatting only (no old $ formulas)
     // Split by bold/italic formatting
-    const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+    const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g).filter(part => part !== undefined && part !== '');
     
     return (
       <Text style={style} selectable={true}>
@@ -224,8 +224,13 @@ const FormattedTextInline: React.FC<{ text: string; style?: any }> = ({ text, st
           return <View key={lineIndex} style={{ height: 8 }} />;
         }
         
+        // Check if this specific line contains LaTeX
+        if (line.includes('\\(') || line.includes('\\[')) {
+          return <MathText key={lineIndex} fontSize={16} lineHeight={22} style={{ ...(style || {}), textAlign: 'left' }}>{line}</MathText>;
+        }
+        
         // Process formatting for this line
-        const parts = line.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+        const parts = line.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g).filter(part => part !== undefined && part !== '');
         
         return (
           <Text key={lineIndex} style={style} selectable={true}>
